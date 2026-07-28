@@ -7,8 +7,8 @@ library repository. Downstream repositories should keep thin local wrapper workf
 then call the reusable implementation here with `uses: cyaris/shared-automation/.github/workflows/<workflow>.yml@main`.
 
 Manual `workflow_dispatch` runs are guarded by the reusable workflow implementations. By default, they only allow the
-`cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout or
-deployment work happens.
+`cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
+release, upload, or deployment work happens.
 
 ## Workflows
 
@@ -16,6 +16,38 @@ deployment work happens.
 
 Reusable workflow for opening a pull request from `dev` to the caller repository default branch after changes are pushed
 to `dev`, when no such pull request already exists.
+
+Typical caller wrapper:
+
+```yaml
+name: Auto-create dev pull request
+
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  auto-create-dev-pr:
+    uses: cyaris/shared-automation/.github/workflows/auto-create-dev-pr.yml@main
+    secrets:
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+```
+
+Important inputs:
+
+- `default-branch`, defaulting to the caller repository default branch
+- `dev-branch`, defaulting to `dev`
+- `title` and `body` for caller-specific pull request text
+- `allowed-dispatch-actor`, defaulting to `cyaris`
+
+Optional secret:
+
+- `RELEASE_TOKEN` for repositories where `github.token` cannot create pull requests
 
 ### `.github/workflows/auto-release-self.yml`
 
@@ -29,7 +61,7 @@ combines the shared release policy in this repository with optional caller polic
 model whether the merge represents a meaningful release milestone, and can publish a GitHub release when explicitly
 enabled.
 
-Downstream wrapper example:
+Typical caller wrapper:
 
 ```yaml
 jobs:
@@ -41,6 +73,15 @@ jobs:
       release-sha: ${{ github.event.pull_request.merge_commit_sha }}
     secrets: inherit
 ```
+
+Important inputs:
+
+- `release-sha`, `pr-number`, `policy-path`, and `default-branch`
+- `openai-model`, defaulting to `gpt-5-mini`
+- `dry-run` for decision reporting without publishing
+- `publish` for explicit release publication after a release is selected
+- `shared-automation-repository` and `shared-automation-ref` for the shared release policy checkout
+- `allowed-dispatch-actor`, defaulting to `cyaris`
 
 Required secret:
 
@@ -57,12 +98,59 @@ Reusable Node package validation workflow. It checks out the caller repository, 
 additional local `file:` dependency repositories, installs dependencies, then runs configurable format, lint, framework
 check, and build commands.
 
+Typical caller wrapper:
+
+```yaml
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  node-package-ci:
+    uses: cyaris/shared-automation/.github/workflows/ci.yml@main
+    with:
+      svelte-lib-ref: ${{ vars.SVELTE_LIB_REF || 'main' }}
+    secrets: inherit
+```
+
+Important inputs:
+
+- `working-directory`, `node-version`, and `install-command`
+- `format-command`, `lint-command`, `check-command`, and `build-command`; set any command to an empty string to skip it
+- `checkout-svelte-lib`, `svelte-lib-repository`, and `svelte-lib-ref`
+- optional `local-dependency-repositories` entries as `owner/repo:path:ref`
+- `allowed-dispatch-actor`, defaulting to `cyaris`
+
+Optional secret:
+
+- `CHECKOUT_TOKEN` for reading private dependency repositories
+
 ### `.github/workflows/rollup-upload.yml`
 
 Reusable embedded bundle workflow. It checks out the caller repository, checks out `svelte-lib` as a local dependency,
 checks out this repository for the composite upload action, then builds and uploads configured bundle files to S3.
 
 The composite action implementation lives at `.github/actions/rollup-upload/action.yml`.
+
+Important inputs:
+
+- `working-directory` and `dist-directory`
+- `bundle-files` as `path:content-type` lines
+- `s3-bucket`, `s3-prefix`, and `aws-region`
+- `aws-role-to-assume` for AWS OIDC authentication
+- `production`, `dry-run`, `sync-dist-extras`, `cache-control`, and `metadata-refresh-files`
+- `shared-automation-repository` and `shared-automation-ref` for the composite action checkout
+- `svelte-lib-repository` and `svelte-lib-ref` for the local `svelte-lib` dependency checkout
+- optional `local-dependency-repositories` entries as `owner/repo:path:ref`
+- `allowed-dispatch-actor`, defaulting to `cyaris`
+
+Optional secrets:
+
+- `CHECKOUT_TOKEN` for reading private dependency repositories
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` when `aws-role-to-assume` is omitted
 
 ## Branch Model
 
