@@ -100,6 +100,9 @@ on:
       CHECKOUT_TOKEN:
         description: Optional token with access to svelte-lib and any local dependency repositories.
         required: false
+      RELEASE_TOKEN:
+        description: Optional fallback token with access to private dependency repositories.
+        required: false
       AWS_ACCESS_KEY_ID:
         description: AWS access key used when aws-role-to-assume is omitted.
         required: false
@@ -139,7 +142,7 @@ jobs:
           repository: ${{ inputs.svelte-lib-repository }}
           ref: ${{ inputs.svelte-lib-ref }}
           path: svelte-lib
-          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+          token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
           persist-credentials: false
 
       - name: Checkout shared automation
@@ -148,7 +151,7 @@ jobs:
           repository: ${{ inputs.shared-automation-repository }}
           ref: ${{ inputs.shared-automation-ref }}
           path: shared-automation
-          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+          token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
           persist-credentials: false
 
       - name: Rollup and upload embedded bundle
@@ -172,5 +175,5 @@ jobs:
           metadata-refresh-files: ${{ inputs.metadata-refresh-files }}
           node-version: ${{ inputs.node-version }}
           svelte-lib-directory: svelte-lib
-          checkout-token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+          checkout-token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
           local-dependency-repositories: ${{ inputs.local-dependency-repositories }}

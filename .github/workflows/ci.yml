@@ -67,6 +67,9 @@ on:
       CHECKOUT_TOKEN:
         description: Optional token with access to svelte-lib and any local dependency repositories.
         required: false
+      RELEASE_TOKEN:
+        description: Optional fallback token with access to private dependency repositories.
+        required: false
 
 permissions:
   contents: read
@@ -97,13 +100,13 @@ jobs:
           repository: ${{ inputs.svelte-lib-repository }}
           ref: ${{ inputs.svelte-lib-ref }}
           path: svelte-lib
-          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+          token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
           persist-credentials: false
 
       - name: Checkout local dependencies
         if: inputs.local-dependency-repositories != ''
         env:
-          GH_TOKEN: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+          GH_TOKEN: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
           LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.local-dependency-repositories }}
         run: |
           set -euo pipefail
