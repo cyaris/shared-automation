@@ -127,6 +127,7 @@ Important inputs:
 Optional secret:
 
 - `CHECKOUT_TOKEN` for reading private dependency repositories
+- `RELEASE_TOKEN` as a checkout fallback when `CHECKOUT_TOKEN` is not configured
 
 ### `.github/workflows/rollup-upload.yml`
 
@@ -150,6 +151,7 @@ Important inputs:
 Optional secrets:
 
 - `CHECKOUT_TOKEN` for reading private dependency repositories
+- `RELEASE_TOKEN` as a checkout fallback when `CHECKOUT_TOKEN` is not configured
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` when `aws-role-to-assume` is omitted
 
 ## Branch Model
