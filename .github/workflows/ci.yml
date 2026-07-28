@@ -13,21 +13,6 @@ on:
         required: false
         type: string
         default: "24"
-      svelte-lib-repository:
-        description: Repository containing svelte-lib.
-        required: false
-        type: string
-        default: cyaris/svelte-lib
-      svelte-lib-ref:
-        description: Ref to checkout for the local svelte-lib file dependency.
-        required: false
-        type: string
-        default: main
-      checkout-svelte-lib:
-        description: Checkout svelte-lib as a sibling local dependency.
-        required: false
-        type: boolean
-        default: true
       local-dependency-repositories:
         description: Optional newline-separated local dependency specs as owner/repo:path:ref.
         required: false
@@ -65,7 +50,7 @@ on:
         default: cyaris
     secrets:
       CHECKOUT_TOKEN:
-        description: Optional token with access to svelte-lib and any local dependency repositories.
+        description: Optional token with access to private local dependency repositories.
         required: false
       RELEASE_TOKEN:
         description: Optional fallback token with access to private dependency repositories.
@@ -91,16 +76,6 @@ jobs:
         uses: actions/checkout@v6
         with:
           path: ${{ github.event.repository.name }}
-          persist-credentials: false
-
-      - name: Checkout svelte-lib
-        if: inputs.checkout-svelte-lib == true
-        uses: actions/checkout@v6
-        with:
-          repository: ${{ inputs.svelte-lib-repository }}
-          ref: ${{ inputs.svelte-lib-ref }}
-          path: svelte-lib
-          token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
           persist-credentials: false
 
       - name: Checkout local dependencies
@@ -135,13 +110,6 @@ jobs:
           node-version: ${{ inputs.node-version }}
           cache: npm
           cache-dependency-path: ${{ inputs.working-directory == '.' && format('{0}/package-lock.json', github.event.repository.name) || format('{0}/{1}/package-lock.json', github.event.repository.name, inputs.working-directory) }}
-
-      - name: Install and build svelte-lib
-        if: inputs.checkout-svelte-lib == true
-        working-directory: svelte-lib
-        run: |
-          npm ci
-          npm run build
 
       - name: Install and build local dependencies
         if: inputs.local-dependency-repositories != ''
