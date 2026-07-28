@@ -53,9 +53,46 @@ Optional secrets:
 
 ### `.github/workflows/ci.yml`
 
-Reusable Node package validation workflow. It checks out the caller repository, optionally checks out `svelte-lib` and
-additional local `file:` dependency repositories, installs dependencies, then runs configurable format, lint, framework
-check, and build commands.
+Reusable Node package validation workflow. It checks out the caller repository, optionally checks out and builds
+`svelte-lib` and additional local `file:` dependency repositories, installs caller dependencies, then runs configurable
+format, lint, framework check, and build commands.
+
+Typical caller wrapper:
+
+```yaml
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  node-package-ci:
+    uses: cyaris/shared-automation/.github/workflows/ci.yml@main
+    with:
+      svelte-lib-ref: ${{ vars.SVELTE_LIB_REF || 'main' }}
+    secrets:
+      CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN }}
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+```
+
+Important inputs:
+
+- `working-directory`, `node-version`, and `install-command`
+- `format-command`, `lint-command`, `check-command`, and `build-command`; set any command to an empty string to skip it
+- `checkout-svelte-lib`, `svelte-lib-repository`, and `svelte-lib-ref`
+- optional `local-dependency-repositories` entries as `owner/repo:path:ref`
+- `allowed-dispatch-actor`, defaulting to `cyaris`
+
+When `checkout-svelte-lib` or `local-dependency-repositories` are used, those repositories are installed and built before
+the caller runs `npm ci`. This keeps local `file:` dependencies usable even when generated `dist/` output is ignored by
+Git.
+
+Optional secret:
+
+- `CHECKOUT_TOKEN` for reading private dependency repositories
+- `RELEASE_TOKEN` as a checkout fallback when `CHECKOUT_TOKEN` is not configured
 
 ### `.github/workflows/rollup-upload.yml`
 
