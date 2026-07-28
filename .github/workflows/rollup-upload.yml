@@ -1,0 +1,176 @@
+name: Rollup and upload embedded bundle
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Directory containing the package.json with the rollup script.
+        required: false
+        type: string
+        default: .
+      dist-directory:
+        description: Dist directory, relative to the repository root.
+        required: false
+        type: string
+        default: dist
+      bundle-files:
+        description: Newline-separated bundle file specs as path:content-type, relative to dist-directory.
+        required: true
+        type: string
+      s3-bucket:
+        description: Destination S3 bucket.
+        required: false
+        type: string
+        default: cyaris.github.io
+      s3-prefix:
+        description: Destination prefix inside the S3 bucket.
+        required: true
+        type: string
+      aws-region:
+        description: AWS region for S3 and STS calls.
+        required: false
+        type: string
+        default: us-east-2
+      aws-role-to-assume:
+        description: Optional AWS role ARN for OIDC authentication. If omitted, AWS access key secrets are used.
+        required: false
+        type: string
+        default: ""
+      production:
+        description: Upload bundle.* names instead of staged test_bundle.* names.
+        required: false
+        type: boolean
+        default: false
+      dry-run:
+        description: Ask the AWS CLI to print S3 operations without writing objects.
+        required: false
+        type: boolean
+        default: false
+      sync-dist-extras:
+        description: Sync non-bundle files from dist-directory to the S3 prefix.
+        required: false
+        type: boolean
+        default: true
+      cache-control:
+        description: Cache-Control metadata for uploaded bundle and extra files.
+        required: false
+        type: string
+        default: no-cache, max-age=0, must-revalidate
+      metadata-refresh-files:
+        description: Optional newline-separated S3 object specs as key:content-type to refresh metadata in place.
+        required: false
+        type: string
+        default: ""
+      node-version:
+        description: Node.js version used for npm installs and builds.
+        required: false
+        type: string
+        default: "24"
+      shared-automation-repository:
+        description: Repository containing the shared rollup upload action.
+        required: false
+        type: string
+        default: cyaris/shared-automation
+      shared-automation-ref:
+        description: Ref used to checkout the shared rollup upload action.
+        required: false
+        type: string
+        default: main
+      svelte-lib-repository:
+        description: Repository containing svelte-lib.
+        required: false
+        type: string
+        default: cyaris/svelte-lib
+      svelte-lib-ref:
+        description: Ref to checkout for the local svelte-lib file dependency.
+        required: false
+        type: string
+        default: main
+      local-dependency-repositories:
+        description: Optional newline-separated local dependency specs as owner/repo:path:ref.
+        required: false
+        type: string
+        default: ""
+      allowed-dispatch-actor:
+        description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
+        required: false
+        type: string
+        default: cyaris
+    secrets:
+      CHECKOUT_TOKEN:
+        description: Optional token with access to svelte-lib and any local dependency repositories.
+        required: false
+      AWS_ACCESS_KEY_ID:
+        description: AWS access key used when aws-role-to-assume is omitted.
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        description: AWS secret key used when aws-role-to-assume is omitted.
+        required: false
+      AWS_SESSION_TOKEN:
+        description: Optional AWS session token used when aws-role-to-assume is omitted.
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  rollup-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate manual dispatcher
+        if: ${{ github.event_name == 'workflow_dispatch' && github.actor != inputs['allowed-dispatch-actor'] }}
+        env:
+          ALLOWED_DISPATCH_ACTOR: ${{ inputs['allowed-dispatch-actor'] }}
+        run: |
+          printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
+          exit 1
+
+      - name: Checkout caller repository
+        uses: actions/checkout@v6
+        with:
+          path: ${{ github.event.repository.name }}
+          persist-credentials: false
+
+      - name: Checkout svelte-lib
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.svelte-lib-repository }}
+          ref: ${{ inputs.svelte-lib-ref }}
+          path: svelte-lib
+          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Checkout shared automation
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.shared-automation-repository }}
+          ref: ${{ inputs.shared-automation-ref }}
+          path: shared-automation
+          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Rollup and upload embedded bundle
+        uses: ./shared-automation/.github/actions/rollup-upload
+        with:
+          caller-repository-name: ${{ github.event.repository.name }}
+          working-directory: ${{ inputs.working-directory }}
+          dist-directory: ${{ inputs.dist-directory }}
+          bundle-files: ${{ inputs.bundle-files }}
+          s3-bucket: ${{ inputs.s3-bucket }}
+          s3-prefix: ${{ inputs.s3-prefix }}
+          aws-region: ${{ inputs.aws-region }}
+          aws-role-to-assume: ${{ inputs.aws-role-to-assume }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          production: ${{ inputs.production }}
+          dry-run: ${{ inputs.dry-run }}
+          sync-dist-extras: ${{ inputs.sync-dist-extras }}
+          cache-control: ${{ inputs.cache-control }}
+          metadata-refresh-files: ${{ inputs.metadata-refresh-files }}
+          node-version: ${{ inputs.node-version }}
+          svelte-lib-directory: svelte-lib
+          checkout-token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+          local-dependency-repositories: ${{ inputs.local-dependency-repositories }}

@@ -1,0 +1,158 @@
+name: Shared Node package CI
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Directory containing the package.json to validate.
+        required: false
+        type: string
+        default: .
+      node-version:
+        description: Node.js version used for installs and checks.
+        required: false
+        type: string
+        default: "24"
+      svelte-lib-repository:
+        description: Repository containing svelte-lib.
+        required: false
+        type: string
+        default: cyaris/svelte-lib
+      svelte-lib-ref:
+        description: Ref to checkout for the local svelte-lib file dependency.
+        required: false
+        type: string
+        default: main
+      checkout-svelte-lib:
+        description: Checkout svelte-lib as a sibling local dependency.
+        required: false
+        type: boolean
+        default: true
+      local-dependency-repositories:
+        description: Optional newline-separated local dependency specs as owner/repo:path:ref.
+        required: false
+        type: string
+        default: ""
+      install-command:
+        description: Dependency install command.
+        required: false
+        type: string
+        default: npm ci
+      format-command:
+        description: Formatting check command. Leave blank to skip.
+        required: false
+        type: string
+        default: npm run format:check
+      lint-command:
+        description: Lint command. Leave blank to skip.
+        required: false
+        type: string
+        default: npm run lint
+      check-command:
+        description: Type or framework check command. Leave blank to skip.
+        required: false
+        type: string
+        default: npm run check
+      build-command:
+        description: Build command. Leave blank to skip.
+        required: false
+        type: string
+        default: npm run build
+      allowed-dispatch-actor:
+        description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
+        required: false
+        type: string
+        default: cyaris
+    secrets:
+      CHECKOUT_TOKEN:
+        description: Optional token with access to svelte-lib and any local dependency repositories.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  node-package-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate manual dispatcher
+        if: ${{ github.event_name == 'workflow_dispatch' && github.actor != inputs['allowed-dispatch-actor'] }}
+        env:
+          ALLOWED_DISPATCH_ACTOR: ${{ inputs['allowed-dispatch-actor'] }}
+        run: |
+          printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
+          exit 1
+
+      - name: Checkout caller repository
+        uses: actions/checkout@v6
+        with:
+          path: ${{ github.event.repository.name }}
+          persist-credentials: false
+
+      - name: Checkout svelte-lib
+        if: inputs.checkout-svelte-lib == true
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.svelte-lib-repository }}
+          ref: ${{ inputs.svelte-lib-ref }}
+          path: svelte-lib
+          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Checkout local dependencies
+        if: inputs.local-dependency-repositories != ''
+        env:
+          GH_TOKEN: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+          LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.local-dependency-repositories }}
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r spec; do
+            spec="${spec#"${spec%%[![:space:]]*}"}"
+            spec="${spec%"${spec##*[![:space:]]}"}"
+
+            if [[ -z "$spec" ]]; then
+              continue
+            fi
+
+            IFS=: read -r repository path ref extra <<< "$spec"
+
+            if [[ -n "${extra:-}" || -z "${repository:-}" || -z "${path:-}" || -z "${ref:-}" ]]; then
+              printf "Invalid local dependency spec: %s\n" "$spec" >&2
+              exit 1
+            fi
+
+            gh repo clone "$repository" "$path" -- --branch "$ref" --depth 1
+          done <<< "$LOCAL_DEPENDENCY_REPOSITORIES"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-directory == '.' && format('{0}/package-lock.json', github.event.repository.name) || format('{0}/{1}/package-lock.json', github.event.repository.name, inputs.working-directory) }}
+
+      - name: Install dependencies
+        working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
+        run: ${{ inputs.install-command }}
+
+      - name: Check formatting
+        if: inputs.format-command != ''
+        working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
+        run: ${{ inputs.format-command }}
+
+      - name: Lint
+        if: inputs.lint-command != ''
+        working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
+        run: ${{ inputs.lint-command }}
+
+      - name: Check package
+        if: inputs.check-command != ''
+        working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
+        run: ${{ inputs.check-command }}
+
+      - name: Build
+        if: inputs.build-command != ''
+        working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
+        run: ${{ inputs.build-command }}

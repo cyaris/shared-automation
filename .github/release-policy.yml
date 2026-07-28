@@ -1,0 +1,40 @@
+versioning:
+  scheme: semver
+  tag_format: vMAJOR.MINOR.PATCH
+  release_title_format: "vX.Y.Z - Plain-English Milestone"
+
+milestone_threshold:
+  create_release_for:
+    - substantial user-facing features
+    - major redesigns or workflow changes
+    - meaningful integrations
+    - important architecture changes
+    - backward-incompatible changes
+    - stable initial public versions
+    - significant performance, reliability, security, accessibility, or compatibility improvements
+    - coherent groups of changes that materially change how the project is used
+  skip_release_for:
+    - routine maintenance
+    - formatting-only changes
+    - minor refactors
+    - isolated dependency updates
+    - small bug fixes without broader user impact
+
+release_notes:
+  audience: project users and future maintainers
+  include:
+    - the milestone in plain language
+    - notable user-facing changes
+    - important operational or compatibility changes
+    - breaking changes or migration notes when present
+  avoid:
+    - raw commit dumps
+    - speculative claims
+    - internal-only implementation detail unless it affects users or maintainers
+
+automation:
+  publish: false
+  release_status: full
+  tag_target: merge commit on the default branch
+  never_move_existing_tags: true
+  never_rename_existing_tags_without_explicit_user_request: true

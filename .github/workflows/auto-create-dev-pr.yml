@@ -1,0 +1,101 @@
+name: Auto-create dev pull request
+
+on:
+  workflow_call:
+    inputs:
+      default-branch:
+        description: Default branch to target. Leave blank to use the caller repository default branch.
+        required: false
+        type: string
+        default: ""
+      dev-branch:
+        description: Development branch to open the pull request from.
+        required: false
+        type: string
+        default: dev
+      title:
+        description: Pull request title to use when creating a new dev pull request.
+        required: false
+        type: string
+        default: ""
+      body:
+        description: Pull request body to use when creating a new dev pull request.
+        required: false
+        type: string
+        default: ""
+      allowed-dispatch-actor:
+        description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
+        required: false
+        type: string
+        default: cyaris
+    secrets:
+      RELEASE_TOKEN:
+        description: Optional token that can create pull requests when github.token is restricted.
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  auto-create-dev-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate manual dispatcher
+        if: ${{ github.event_name == 'workflow_dispatch' && github.actor != inputs['allowed-dispatch-actor'] }}
+        env:
+          ALLOWED_DISPATCH_ACTOR: ${{ inputs['allowed-dispatch-actor'] }}
+        run: |
+          printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
+          exit 1
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create pull request if needed
+        env:
+          DEFAULT_BRANCH: ${{ inputs.default-branch || github.event.repository.default_branch }}
+          DEV_BRANCH: ${{ inputs.dev-branch }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          PR_BODY: ${{ inputs.body }}
+          PR_TITLE: ${{ inputs.title }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$DEFAULT_BRANCH" == "$DEV_BRANCH" ]]; then
+            printf "The default branch is dev, so there is no separate base branch for a pull request.\n"
+            exit 0
+          fi
+
+          git fetch --no-tags origin \
+            "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" \
+            "+refs/heads/${DEV_BRANCH}:refs/remotes/origin/${DEV_BRANCH}"
+
+          if [[ "$(git rev-list --count "origin/${DEFAULT_BRANCH}..origin/${DEV_BRANCH}")" == "0" ]]; then
+            printf "dev has no commits ahead of %s.\n" "$DEFAULT_BRANCH"
+            exit 0
+          fi
+
+          if [[ "$(gh pr list --repo "$REPOSITORY" --state open --base "$DEFAULT_BRANCH" --head "$DEV_BRANCH" --json number --jq 'length')" != "0" ]]; then
+            printf "An open pull request from dev to %s already exists.\n" "$DEFAULT_BRANCH"
+            exit 0
+          fi
+
+          if [[ -z "$PR_TITLE" ]]; then
+            PR_TITLE="Merge ${DEV_BRANCH} into ${DEFAULT_BRANCH}"
+          fi
+
+          if [[ -z "$PR_BODY" ]]; then
+            PR_BODY="This pull request was automatically created after changes were pushed to ${DEV_BRANCH}."
+          fi
+
+          gh pr create \
+            --repo "$REPOSITORY" \
+            --base "$DEFAULT_BRANCH" \
+            --head "$DEV_BRANCH" \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY"

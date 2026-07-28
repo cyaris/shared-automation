@@ -1,0 +1,273 @@
+name: Rollup and upload embedded bundle
+description: Build a local Svelte rollup bundle and upload configured artifacts to S3.
+
+inputs:
+  caller-repository-name:
+    description: Directory name where the caller repository is checked out.
+    required: true
+  working-directory:
+    description: Directory containing the package.json with the rollup script, relative to the caller repository root.
+    required: false
+    default: .
+  dist-directory:
+    description: Dist directory, relative to the caller repository root.
+    required: false
+    default: dist
+  bundle-files:
+    description: Newline-separated bundle file specs as path:content-type, relative to dist-directory.
+    required: true
+  s3-bucket:
+    description: Destination S3 bucket.
+    required: false
+    default: cyaris.github.io
+  s3-prefix:
+    description: Destination prefix inside the S3 bucket.
+    required: true
+  aws-region:
+    description: AWS region for S3 and STS calls.
+    required: false
+    default: us-east-2
+  aws-role-to-assume:
+    description: Optional AWS role ARN for OIDC authentication. If omitted, AWS access key inputs are used.
+    required: false
+    default: ""
+  aws-access-key-id:
+    description: AWS access key used when aws-role-to-assume is omitted.
+    required: false
+    default: ""
+  aws-secret-access-key:
+    description: AWS secret key used when aws-role-to-assume is omitted.
+    required: false
+    default: ""
+  aws-session-token:
+    description: Optional AWS session token used when aws-role-to-assume is omitted.
+    required: false
+    default: ""
+  production:
+    description: Upload bundle.* names instead of staged test_bundle.* names.
+    required: false
+    default: "false"
+  dry-run:
+    description: Ask the AWS CLI to print S3 operations without writing objects.
+    required: false
+    default: "false"
+  sync-dist-extras:
+    description: Sync non-bundle files from dist-directory to the S3 prefix.
+    required: false
+    default: "true"
+  cache-control:
+    description: Cache-Control metadata for uploaded bundle and extra files.
+    required: false
+    default: no-cache, max-age=0, must-revalidate
+  metadata-refresh-files:
+    description: Optional newline-separated S3 object specs as key:content-type to refresh metadata in place.
+    required: false
+    default: ""
+  node-version:
+    description: Node.js version used for npm installs and builds.
+    required: false
+    default: "24"
+  svelte-lib-directory:
+    description: Directory containing the checked-out svelte-lib repository.
+    required: false
+    default: svelte-lib
+  checkout-token:
+    description: Optional token with access to private local dependency repositories.
+    required: false
+    default: ""
+  local-dependency-repositories:
+    description: Optional newline-separated local dependency specs as owner/repo:path:ref.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout local dependency repositories
+      if: inputs.local-dependency-repositories != ''
+      env:
+        CHECKOUT_TOKEN: ${{ inputs.checkout-token }}
+        LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.local-dependency-repositories }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        while IFS= read -r spec; do
+          if [[ -z "$spec" ]]; then
+            continue
+          fi
+
+          IFS=: read -r repository checkout_path ref <<< "$spec"
+
+          if [[ -z "$repository" || -z "$checkout_path" || -z "$ref" ]]; then
+            printf "Invalid local dependency spec: %s\n" "$spec" >&2
+            exit 1
+          fi
+
+          if [[ -z "$CHECKOUT_TOKEN" ]]; then
+            git clone --depth 1 --branch "$ref" "https://github.com/${repository}.git" "$checkout_path"
+          else
+            git clone \
+              --depth 1 \
+              --branch "$ref" \
+              "https://x-access-token:${CHECKOUT_TOKEN}@github.com/${repository}.git" \
+              "$checkout_path"
+            git -C "$checkout_path" remote set-url origin "https://github.com/${repository}.git"
+          fi
+        done <<< "$LOCAL_DEPENDENCY_REPOSITORIES"
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+        package-manager-cache: false
+
+    - name: Install and build svelte-lib
+      working-directory: ${{ inputs.svelte-lib-directory }}
+      shell: bash
+      run: |
+        npm ci
+        npm run build
+
+    - name: Install and build local dependency repositories
+      if: inputs.local-dependency-repositories != ''
+      env:
+        LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.local-dependency-repositories }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        while IFS= read -r spec; do
+          if [[ -z "$spec" ]]; then
+            continue
+          fi
+
+          IFS=: read -r repository checkout_path ref <<< "$spec"
+
+          if [[ -f "$checkout_path/package-lock.json" ]]; then
+            npm --prefix "$checkout_path" ci
+          else
+            npm --prefix "$checkout_path" install
+          fi
+
+          npm --prefix "$checkout_path" run build
+        done <<< "$LOCAL_DEPENDENCY_REPOSITORIES"
+
+    - name: Install caller dependencies
+      working-directory: ${{ inputs.caller-repository-name }}/${{ inputs.working-directory }}
+      shell: bash
+      run: npm ci
+
+    - name: Build rollup bundle
+      working-directory: ${{ inputs.caller-repository-name }}/${{ inputs.working-directory }}
+      shell: bash
+      run: npm run rollup
+
+    - name: Configure AWS credentials with OIDC role
+      if: inputs.aws-role-to-assume != ''
+      uses: aws-actions/configure-aws-credentials@v6
+      with:
+        aws-region: ${{ inputs.aws-region }}
+        role-to-assume: ${{ inputs.aws-role-to-assume }}
+
+    - name: Configure AWS credentials with access keys
+      if: inputs.aws-role-to-assume == ''
+      uses: aws-actions/configure-aws-credentials@v6
+      with:
+        aws-region: ${{ inputs.aws-region }}
+        aws-access-key-id: ${{ inputs.aws-access-key-id }}
+        aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
+        aws-session-token: ${{ inputs.aws-session-token }}
+
+    - name: Upload rollup artifacts
+      env:
+        AWS_REGION: ${{ inputs.aws-region }}
+        BUNDLE_FILES: ${{ inputs.bundle-files }}
+        CACHE_CONTROL: ${{ inputs.cache-control }}
+        DIST_DIRECTORY: ${{ inputs.caller-repository-name }}/${{ inputs.dist-directory }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        METADATA_REFRESH_FILES: ${{ inputs.metadata-refresh-files }}
+        PRODUCTION: ${{ inputs.production }}
+        S3_BUCKET: ${{ inputs.s3-bucket }}
+        S3_PREFIX: ${{ inputs.s3-prefix }}
+        SYNC_DIST_EXTRAS: ${{ inputs.sync-dist-extras }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        aws_args=(--region "$AWS_REGION")
+        bundle_prefix="test_"
+
+        if [[ "$PRODUCTION" == "true" ]]; then
+          bundle_prefix=""
+        fi
+
+        if [[ "$DRY_RUN" == "true" ]]; then
+          aws_args+=(--dryrun)
+        fi
+
+        if [[ ! -d "$DIST_DIRECTORY" ]]; then
+          printf "Missing dist directory: %s\n" "$DIST_DIRECTORY" >&2
+          exit 1
+        fi
+
+        sync_exclude_args=()
+
+        while IFS= read -r spec; do
+          if [[ -z "$spec" ]]; then
+            continue
+          fi
+
+          bundle_path="${spec%%:*}"
+          sync_exclude_args+=(--exclude "$bundle_path")
+        done <<< "$BUNDLE_FILES"
+
+        if [[ "$SYNC_DIST_EXTRAS" == "true" ]]; then
+          aws s3 sync "$DIST_DIRECTORY/" "s3://${S3_BUCKET}/${S3_PREFIX%/}/" \
+            "${aws_args[@]}" \
+            "${sync_exclude_args[@]}" \
+            --cache-control "$CACHE_CONTROL"
+        fi
+
+        while IFS= read -r spec; do
+          if [[ -z "$spec" ]]; then
+            continue
+          fi
+
+          bundle_path="${spec%%:*}"
+          content_type="${spec#*:}"
+          source_file="${DIST_DIRECTORY%/}/${bundle_path}"
+          bundle_dir="$(dirname "$bundle_path")"
+          bundle_name="$(basename "$bundle_path")"
+
+          if [[ "$bundle_dir" == "." ]]; then
+            s3_key="${S3_PREFIX%/}/${bundle_prefix}${bundle_name}"
+          else
+            s3_key="${S3_PREFIX%/}/${bundle_dir}/${bundle_prefix}${bundle_name}"
+          fi
+
+          if [[ ! -f "$source_file" ]]; then
+            printf "Missing expected rollup output: %s\n" "$source_file" >&2
+            exit 1
+          fi
+
+          aws s3 cp "$source_file" "s3://${S3_BUCKET}/${s3_key}" \
+            "${aws_args[@]}" \
+            --content-type "$content_type" \
+            --cache-control "$CACHE_CONTROL"
+        done <<< "$BUNDLE_FILES"
+
+        while IFS= read -r spec; do
+          if [[ -z "$spec" ]]; then
+            continue
+          fi
+
+          s3_key="${spec%%:*}"
+          content_type="${spec#*:}"
+
+          aws s3 cp "s3://${S3_BUCKET}/${s3_key}" "s3://${S3_BUCKET}/${s3_key}" \
+            "${aws_args[@]}" \
+            --metadata-directive REPLACE \
+            --content-type "$content_type" \
+            --cache-control "$CACHE_CONTROL"
+        done <<< "$METADATA_REFRESH_FILES"
