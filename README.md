@@ -5,6 +5,8 @@ Shared GitHub Actions workflows and automation used across cyaris repositories.
 This repository is the neutral home for reusable workflow implementations that should not live in an application or
 library repository. Downstream repositories should keep thin local wrapper workflows that define when the workflow runs,
 then call the reusable implementation here with `uses: cyaris/shared-automation/.github/workflows/<workflow>.yml@main`.
+This repository is public, so child repositories do not need a private checkout token just to read these reusable
+workflow files.
 
 Manual `workflow_dispatch` runs are guarded by the reusable workflow implementations. By default, they only allow the
 `cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
@@ -71,7 +73,10 @@ jobs:
     with:
       pr-number: ${{ github.event.pull_request.number }}
       release-sha: ${{ github.event.pull_request.merge_commit_sha }}
-    secrets: inherit
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN }}
 ```
 
 Important inputs:
@@ -113,7 +118,9 @@ jobs:
     uses: cyaris/shared-automation/.github/workflows/ci.yml@main
     with:
       svelte-lib-ref: ${{ vars.SVELTE_LIB_REF || 'main' }}
-    secrets: inherit
+    secrets:
+      CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN }}
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 ```
 
 Important inputs:
@@ -153,6 +160,10 @@ Optional secrets:
 - `CHECKOUT_TOKEN` for reading private dependency repositories
 - `RELEASE_TOKEN` as a checkout fallback when `CHECKOUT_TOKEN` is not configured
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` when `aws-role-to-assume` is omitted
+
+Private dependency note: callers that install private repositories such as `cyaris/svelte-lib` through local `file:`
+dependencies must pass a checkout-capable `CHECKOUT_TOKEN` or `RELEASE_TOKEN`. Callers that only read the reusable
+workflow files from this public repository do not need a token for that read.
 
 ## Branch Model
 
