@@ -99,9 +99,9 @@ Optional secrets:
 
 ### `.github/workflows/ci.yml`
 
-Reusable Node package validation workflow. It checks out the caller repository, optionally checks out `svelte-lib` and
-additional local `file:` dependency repositories, installs dependencies, then runs configurable format, lint, framework
-check, and build commands.
+Reusable Node package validation workflow. It checks out the caller repository, optionally checks out and builds
+`svelte-lib` and additional local `file:` dependency repositories, installs caller dependencies, then runs configurable
+format, lint, framework check, and build commands.
 
 Typical caller wrapper:
 
@@ -130,6 +130,10 @@ Important inputs:
 - `checkout-svelte-lib`, `svelte-lib-repository`, and `svelte-lib-ref`
 - optional `local-dependency-repositories` entries as `owner/repo:path:ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
+
+When `checkout-svelte-lib` or `local-dependency-repositories` are used, those repositories are installed and built before
+the caller runs `npm ci`. This keeps local `file:` dependencies usable even when generated `dist/` output is ignored by
+Git.
 
 Optional secret:
 

@@ -136,6 +136,44 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ inputs.working-directory == '.' && format('{0}/package-lock.json', github.event.repository.name) || format('{0}/{1}/package-lock.json', github.event.repository.name, inputs.working-directory) }}
 
+      - name: Install and build svelte-lib
+        if: inputs.checkout-svelte-lib == true
+        working-directory: svelte-lib
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install and build local dependencies
+        if: inputs.local-dependency-repositories != ''
+        env:
+          LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.local-dependency-repositories }}
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r spec; do
+            spec="${spec#"${spec%%[![:space:]]*}"}"
+            spec="${spec%"${spec##*[![:space:]]}"}"
+
+            if [[ -z "$spec" ]]; then
+              continue
+            fi
+
+            IFS=: read -r repository path ref extra <<< "$spec"
+
+            if [[ -n "${extra:-}" || -z "${repository:-}" || -z "${path:-}" || -z "${ref:-}" ]]; then
+              printf "Invalid local dependency spec: %s\n" "$spec" >&2
+              exit 1
+            fi
+
+            if [[ -f "$path/package-lock.json" ]]; then
+              npm --prefix "$path" ci
+            else
+              npm --prefix "$path" install
+            fi
+
+            npm --prefix "$path" run build
+          done <<< "$LOCAL_DEPENDENCY_REPOSITORIES"
+
       - name: Install dependencies
         working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
         run: ${{ inputs.install-command }}
