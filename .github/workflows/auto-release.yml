@@ -242,16 +242,6 @@ jobs:
               fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason<<REASON\n${decision.reason}\nREASON\n`)
             }
 
-            const writeNoRelease = (reason) => {
-              writeDecision({
-                create_release: false,
-                tag: "",
-                title: "",
-                notes: "",
-                reason: String(reason || "Release decision was not available.").replace(/\s+/g, " ").trim()
-              })
-            }
-
             const context = JSON.parse(fs.readFileSync("release-context.json", "utf8"))
             const schema = {
               type: "object",
@@ -306,8 +296,7 @@ jobs:
                 signal: controller.signal
               })
             } catch (error) {
-              writeNoRelease(`OpenAI API request could not be completed: ${error.message}`)
-              return
+              throw new Error(`OpenAI API request could not be completed: ${error.message}`)
             } finally {
               clearTimeout(timeout)
             }
@@ -322,8 +311,7 @@ jobs:
 
             if (!response.ok) {
               const apiMessage = data?.error?.message || response.statusText || "unknown error"
-              writeNoRelease(`OpenAI API request returned ${response.status}: ${apiMessage}`)
-              return
+              throw new Error(`OpenAI API request returned ${response.status}: ${apiMessage}`)
             }
 
             const outputText = data.output_text || (data.output || [])

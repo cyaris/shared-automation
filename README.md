@@ -97,8 +97,8 @@ Important inputs:
 
 Optional secrets:
 
-- `OPENAI_API_KEY` for release decisions; when omitted, unavailable, or unable to complete a request, the workflow skips
-  release publication without failing
+- `OPENAI_API_KEY` for release decisions; when omitted, the workflow skips release decision work without failing, but
+  configured keys must successfully complete OpenAI API requests
 - `RELEASE_TOKEN` for release and tag creation when broader permissions are needed
 - `CHECKOUT_TOKEN` for reading private repositories used by the workflow
 
