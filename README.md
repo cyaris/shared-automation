@@ -40,6 +40,9 @@ jobs:
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 ```
 
+The reusable job serializes runs with a repository/branch-specific concurrency group. This queues overlapping pushes
+before the pull request existence check and creation step run.
+
 Important inputs:
 
 - `default-branch`, defaulting to the caller repository default branch
@@ -51,28 +54,36 @@ Optional secret:
 
 - `RELEASE_TOKEN` for repositories where `github.token` cannot create pull requests
 
+### `.github/workflows/auto-create-dev-pr-self.yml`
+
+Local workflow for this repository. It runs on pushes to `dev`, then delegates pull request creation to
+`.github/workflows/auto-create-dev-pr.yml`.
+
 ### `.github/workflows/auto-release-self.yml`
 
-Local workflow for this repository. It runs after merged pull requests and from manual dispatch, then delegates release
-decisions to `.github/workflows/auto-release.yml`.
+Local workflow for this repository. It runs from manual dispatch only, then delegates release reconciliation to
+`.github/workflows/auto-release.yml`.
 
 ### `.github/workflows/auto-release.yml`
 
-Reusable release-decision workflow for `workflow_call` consumers. It gathers release context from the caller repository,
-combines the shared release policy in this repository with optional caller policy overrides, asks the configured OpenAI
-model whether the merge represents a meaningful release milestone, and can publish a GitHub release when explicitly
-enabled.
+Reusable release-reconciliation workflow for `workflow_call` consumers. It gathers the caller repository's commit
+history through a selected commit, combines the shared release policy in this repository with optional caller policy
+overrides, asks the configured OpenAI model which existing releases should be updated and which missing release
+milestones should be created, and can apply those changes when explicitly enabled.
 
 Typical caller wrapper:
 
 ```yaml
 jobs:
-  auto-release-after-pr:
-    if: github.event.pull_request.merged == true
+  auto-release:
     uses: cyaris/shared-automation/.github/workflows/auto-release.yml@main
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     with:
-      pr-number: ${{ github.event.pull_request.number }}
-      release-sha: ${{ github.event.pull_request.merge_commit_sha }}
+      publish: true
+      update-existing: true
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -83,16 +94,20 @@ Important inputs:
 
 - `release-sha`, `pr-number`, `policy-path`, and `default-branch`
 - `openai-model`, defaulting to `gpt-5-mini`
-- `dry-run` for decision reporting without publishing
-- `publish` for explicit release publication after a release is selected
+- `dry-run` for decision reporting without applying release changes, defaulting to `false`
+- `publish` for applying selected release creates and updates, defaulting to `false`
+- `update-existing` for allowing edits to existing release titles and notes, defaulting to `true`
 - `shared-automation-repository` and `shared-automation-ref` for the shared release policy checkout
 - `svelte-lib-repository` and `svelte-lib-ref` as deprecated compatibility aliases for
   `shared-automation-repository` and `shared-automation-ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
+The local `.github/workflows/auto-release-self.yml` wrapper overrides `publish` and `update-existing` to `true` so
+manual runs in this repository apply the selected reconciliation by default.
+
 Required secret:
 
-- `OPENAI_API_KEY`
+- `OPENAI_API_KEY` for release reconciliation; missing secrets and failed OpenAI API requests fail the workflow
 
 Optional secrets:
 

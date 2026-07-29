@@ -4,12 +4,12 @@ on:
   workflow_call:
     inputs:
       release-sha:
-        description: Commit SHA to evaluate and release.
+        description: Commit SHA to reconcile releases through. Blank uses the default branch tip.
         required: false
         type: string
         default: ""
       pr-number:
-        description: Pull request number associated with the merge.
+        description: Optional pull request number to comment on.
         required: false
         type: string
         default: ""
@@ -19,7 +19,7 @@ on:
         type: string
         default: .github/release-policy.yml
       openai-model:
-        description: OpenAI model used to decide release milestones and write release notes.
+        description: OpenAI model used to reconcile release milestones and notes.
         required: false
         type: string
         default: gpt-5-mini
@@ -29,15 +29,20 @@ on:
         type: string
         default: ""
       dry-run:
-        description: Decide and report the release without publishing it.
+        description: Decide and report release changes without applying them.
         required: false
         type: boolean
         default: false
       publish:
-        description: Publish a selected release. Keep false to report the decision only.
+        description: Apply selected release creates and updates. Keep false to report the plan only.
         required: false
         type: boolean
         default: false
+      update-existing:
+        description: Allow updates to existing release titles and notes.
+        required: false
+        type: boolean
+        default: true
       shared-automation-repository:
         description: Repository containing the shared release policy.
         required: false
@@ -77,7 +82,7 @@ on:
 permissions:
   contents: write
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: auto-release-${{ github.repository }}-${{ inputs.release-sha || github.sha }}
@@ -99,6 +104,17 @@ jobs:
           printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
           exit 1
 
+      - name: Check release decision credentials
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            printf "OPENAI_API_KEY is required for release reconciliation.\n" >&2
+            exit 1
+          fi
+
       - name: Checkout caller repository
         uses: actions/checkout@v6
         with:
@@ -112,6 +128,7 @@ jobs:
           repository: ${{ inputs.shared-automation-repository || inputs.svelte-lib-repository || 'cyaris/shared-automation' }}
           ref: ${{ inputs.shared-automation-ref || inputs.svelte-lib-ref || 'main' }}
           path: shared-automation
+          persist-credentials: false
           token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
 
       - name: Set up Node.js
@@ -126,81 +143,159 @@ jobs:
           DEFAULT_BRANCH_INPUT: ${{ inputs.default-branch }}
           EVENT_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           POLICY_PATH: ${{ inputs.policy-path }}
-          PR_NUMBER: ${{ inputs.pr-number }}
           RELEASE_SHA_INPUT: ${{ inputs.release-sha }}
+          UPDATE_EXISTING: ${{ inputs.update-existing }}
         run: |
           set -euo pipefail
 
           default_branch="${DEFAULT_BRANCH_INPUT:-$EVENT_DEFAULT_BRANCH}"
-          release_sha="${RELEASE_SHA_INPUT:-$(git rev-parse HEAD)}"
+          if ! git fetch --force --tags origin; then
+            printf "Failed to fetch tags from %s.\n" "$GITHUB_REPOSITORY" >&2
+            exit 1
+          fi
 
-          git fetch --force --tags origin
           if [[ -n "$default_branch" ]]; then
-            git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"
+            if ! git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
+              printf "Failed to fetch default branch %s from %s.\n" "$default_branch" "$GITHUB_REPOSITORY" >&2
+              exit 1
+            fi
+          fi
+
+          release_sha="$RELEASE_SHA_INPUT"
+          if [[ -z "$release_sha" ]]; then
+            if [[ -n "$default_branch" ]]; then
+              release_sha="$(git rev-parse "origin/$default_branch")"
+            else
+              release_sha="$(git rev-parse HEAD)"
+            fi
           fi
 
           if ! git cat-file -e "${release_sha}^{commit}" 2>/dev/null; then
-            git fetch --force origin "$release_sha"
+            if ! git fetch --force origin "$release_sha"; then
+              printf "Failed to fetch release_sha %s from %s.\n" "$release_sha" "$GITHUB_REPOSITORY" >&2
+              exit 1
+            fi
           fi
 
-          latest_release_json="$(gh release list --limit 1 --exclude-drafts --exclude-pre-releases --json tagName,name,publishedAt --jq '.[0] // {}' 2>/dev/null || printf '{}')"
-          latest_tag="$(node -e 'const data = JSON.parse(process.argv[1]); process.stdout.write(data.tagName || "")' "$latest_release_json")"
-
-          range="$release_sha"
-          if [[ -n "$latest_tag" ]] && git rev-parse -q --verify "refs/tags/$latest_tag^{commit}" >/dev/null; then
-            range="$latest_tag..$release_sha"
+          if [[ -n "$default_branch" ]]; then
+            if ! git merge-base --is-ancestor "$release_sha" "origin/$default_branch"; then
+              printf "release_sha %s is not an ancestor of origin/%s.\n" "$release_sha" "$default_branch" >&2
+              exit 1
+            fi
           fi
 
-          git log --reverse --date=short --format="- %h %ad %s" "$range" -- > ../commits.all.txt
-          sed -n '1,120p' ../commits.all.txt > ../commits.txt
-
-          if [[ "$range" == *".."* ]]; then
-            git diff --name-only "$range" -- > ../files.all.txt
-          else
-            git ls-tree -r --name-only "$release_sha" > ../files.all.txt
-          fi
-          sed -n '1,200p' ../files.all.txt > ../files.txt
-
-          if [[ -n "$PR_NUMBER" ]]; then
-            gh pr view "$PR_NUMBER" --json number,title,body,labels,baseRefName,headRefName,url,mergedAt,mergeCommit,files > ../pr.json
-          else
-            printf "{}" > ../pr.json
-          fi
+          git log --reverse --date=short --format="%H%x09%h%x09%ad%x09%s" "$release_sha" -- > ../commits.tsv
+          git ls-tree -r --name-only "$release_sha" > ../files.txt
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate --slurp > ../existing-releases.raw.json
 
           export DEFAULT_BRANCH="$default_branch"
-          export LATEST_RELEASE_JSON="$latest_release_json"
           export RELEASE_SHA="$release_sha"
 
           node <<'NODE'
+          const cp = require("child_process")
           const fs = require("fs")
 
-          const read = (path, max = 20000) => {
+          const read = (path, max) => {
             try {
-              return fs.readFileSync(path, "utf8").slice(0, max)
+              const text = fs.readFileSync(path, "utf8")
+              return typeof max === "number" ? text.slice(0, max) : text
             } catch {
               return ""
             }
           }
+
+          const git = (args) =>
+            cp.execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()
+
+          const maxCommits = 1000
+          const maxFiles = 1000
+          const commitLines = read("../commits.tsv")
+            .split("\n")
+            .filter(Boolean)
+
+          const allCommits = commitLines.map((line, index) => {
+            const [sha, shortSha, date, ...subjectParts] = line.split("\t")
+            return {
+              index: index + 1,
+              sha,
+              shortSha,
+              date,
+              subject: subjectParts.join("\t")
+            }
+          })
+          const commitIndexBySha = new Map(allCommits.map((commit, index) => [commit.sha, index]))
+
+          const releasePages = JSON.parse(read("../existing-releases.raw.json") || "[]")
+          const rawReleases = releasePages.flat()
+          const existingReleases = rawReleases
+            .filter((release) => !release.draft)
+            .map((release) => {
+              let targetSha = ""
+              try {
+                targetSha = git(["rev-list", "-n", "1", `refs/tags/${release.tag_name}^{}`])
+              } catch {
+                try {
+                  targetSha = git(["rev-parse", `${release.target_commitish}^{commit}`])
+                } catch {
+                  targetSha = ""
+                }
+              }
+
+              return {
+                tag: release.tag_name || "",
+                title: release.name || "",
+                notes: release.body || "",
+                publishedAt: release.published_at || "",
+                prerelease: Boolean(release.prerelease),
+                targetCommitish: release.target_commitish || "",
+                targetSha,
+                url: release.html_url || ""
+              }
+            })
+            .sort((a, b) => {
+              const aIndex = commitIndexBySha.has(a.targetSha) ? commitIndexBySha.get(a.targetSha) : -1
+              const bIndex = commitIndexBySha.has(b.targetSha) ? commitIndexBySha.get(b.targetSha) : -1
+              return (aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex) - (bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex)
+            })
+
+          const releaseIndexes = existingReleases
+            .map((release) => commitIndexBySha.get(release.targetSha))
+            .filter((index) => Number.isInteger(index))
+          const oldestReleaseIndex = releaseIndexes.length ? Math.min(...releaseIndexes) : Math.max(0, allCommits.length - maxCommits)
+          const commitsSinceOldestRelease = allCommits.slice(oldestReleaseIndex)
+          const commits = commitsSinceOldestRelease.slice(-maxCommits)
+          const allFiles = read("../files.txt").split("\n").filter(Boolean)
 
           const context = {
             repository: process.env.GITHUB_REPOSITORY,
             defaultBranch: process.env.DEFAULT_BRANCH || "",
             releaseSha: process.env.RELEASE_SHA || "",
             policyPath: process.env.POLICY_PATH,
+            updateExisting: process.env.UPDATE_EXISTING === "true",
+            commitCount: allCommits.length,
+            omittedCommitCount: allCommits.length - commits.length,
+            commitWindow: {
+              maxCommits,
+              startIndex: commits.length ? commits[0].index : 0,
+              endIndex: commits.length ? commits[commits.length - 1].index : 0,
+              includesCommitsSinceOldestExistingReleaseTarget: releaseIndexes.length > 0 && commitsSinceOldestRelease.length <= maxCommits
+            },
             basePolicy: read("../shared-automation/.github/release-policy.yml"),
             localPolicy: read(process.env.POLICY_PATH),
             agentsGuidance: read("AGENTS.md", 24000),
-            latestRelease: JSON.parse(process.env.LATEST_RELEASE_JSON || "{}"),
-            pullRequest: JSON.parse(read("../pr.json") || "{}"),
-            commits: read("../commits.txt"),
-            changedFiles: read("../files.txt")
+            existingReleases,
+            commits,
+            changedFilesAtReleaseSha: allFiles.slice(0, maxFiles),
+            omittedFileCount: Math.max(0, allFiles.length - maxFiles)
           }
 
           fs.writeFileSync("../release-context.json", JSON.stringify(context, null, 2))
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `commit_count=${allCommits.length}\n`)
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_count=${existingReleases.length}\n`)
           NODE
 
-      - name: Decide release
-        id: decide
+      - name: Plan release reconciliation
+        id: plan
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ inputs.openai-model }}
@@ -208,170 +303,324 @@ jobs:
           set -euo pipefail
 
           node <<'NODE'
+          const crypto = require("crypto")
           const fs = require("fs")
 
-          const context = JSON.parse(fs.readFileSync("release-context.json", "utf8"))
-          const schema = {
-            type: "object",
-            additionalProperties: false,
-            required: ["create_release", "tag", "title", "notes", "reason"],
-            properties: {
-              create_release: { type: "boolean" },
-              tag: { type: "string" },
-              title: { type: "string" },
-              notes: { type: "string" },
-              reason: { type: "string" }
-            }
-          }
-
-          const system = [
-            "You decide whether a merged pull request marks a release milestone.",
-            "Use the base release policy, then apply any local policy overrides.",
-            "Create releases only for meaningful milestones, not routine maintenance.",
-            "Pick the next tag using the repository's existing release history and policy.",
-            "The tag must be a new tag, must not contain spaces or slashes, and should normally start with v.",
-            "Write concise GitHub release notes for users and future maintainers.",
-            "Return only JSON that matches the provided schema."
-          ].join(" ")
-
-          const body = {
-            model: process.env.OPENAI_MODEL,
-            input: [
-              { role: "system", content: system },
-              { role: "user", content: JSON.stringify(context, null, 2) }
-            ],
-            text: {
-              format: {
-                type: "json_schema",
-                name: "release_decision",
-                strict: true,
-                schema
+          ;(async () => {
+            const schema = {
+              type: "object",
+              additionalProperties: false,
+              required: ["summary", "actions"],
+              properties: {
+                summary: { type: "string" },
+                actions: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["action", "tag", "target_sha", "title", "notes", "reason"],
+                    properties: {
+                      action: { type: "string", enum: ["create", "update", "skip"] },
+                      tag: { type: "string" },
+                      target_sha: { type: "string" },
+                      title: { type: "string" },
+                      notes: { type: "string" },
+                      reason: { type: "string" }
+                    }
+                  }
+                }
               }
             }
-          }
 
-          const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 120000)
-          let response
-          try {
-            response = await fetch("https://api.openai.com/v1/responses", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify(body),
-              signal: controller.signal
-            })
-          } finally {
-            clearTimeout(timeout)
-          }
+            const context = JSON.parse(fs.readFileSync("release-context.json", "utf8"))
+            const existingTags = new Set(context.existingReleases.map((release) => release.tag))
+            const commitShas = new Set(context.commits.map((commit) => commit.sha))
 
-          const data = await response.json()
-          if (!response.ok) {
-            throw new Error(`OpenAI API request failed: ${response.status} ${JSON.stringify(data)}`)
-          }
+            const system = [
+              "You reconcile GitHub releases for an entire repository commit history.",
+              "Use the base release policy, then apply local release policy overrides.",
+              "Compare every commit from the repository root through releaseSha with the existing releases.",
+              "Create actions for meaningful missing release milestones between existing release targets.",
+              "Update actions may improve existing release titles or notes, but must keep the existing tag and target_sha.",
+              "Skip routine maintenance, formatting, minor refactoring, and small dependency chores unless their combined impact is significant.",
+              "Tags must be stable version tags, must be unique, must not contain spaces or slashes, and should normally start with v.",
+              "Release notes should be concise and useful to users and future maintainers.",
+              "Return only JSON that matches the provided schema."
+            ].join(" ")
 
-          const outputText = data.output_text || (data.output || [])
-            .flatMap((item) => item.content || [])
-            .find((content) => content.type === "output_text")?.text
+            const body = {
+              model: process.env.OPENAI_MODEL,
+              input: [
+                { role: "system", content: system },
+                { role: "user", content: JSON.stringify(context, null, 2) }
+              ],
+              text: {
+                format: {
+                  type: "json_schema",
+                  name: "release_reconciliation_plan",
+                  strict: true,
+                  schema
+                }
+              }
+            }
 
-          if (!outputText) {
-            throw new Error(`OpenAI response did not include output text: ${JSON.stringify(data)}`)
-          }
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 120000)
+            let response
+            try {
+              response = await fetch("https://api.openai.com/v1/responses", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify(body),
+                signal: controller.signal
+              })
+            } catch (error) {
+              throw new Error(`OpenAI API request could not be completed: ${error.message}`)
+            } finally {
+              clearTimeout(timeout)
+            }
 
-          const decision = JSON.parse(outputText)
-          decision.create_release = Boolean(decision.create_release)
-          decision.tag = String(decision.tag || "").trim()
-          decision.title = String(decision.title || "").replace(/\s+/g, " ").trim()
-          decision.notes = String(decision.notes || "").trim()
-          decision.reason = String(decision.reason || "").replace(/\s+/g, " ").trim()
+            const responseText = await response.text()
+            let data
+            try {
+              data = responseText ? JSON.parse(responseText) : {}
+            } catch {
+              data = { raw: responseText.slice(0, 1000) }
+            }
 
-          const tagPattern = /^v[0-9]+(\.[0-9]+){0,2}([._-][A-Za-z0-9]+)?$/
-          if (!decision.create_release) {
-            decision.tag = ""
-          } else if (!tagPattern.test(decision.tag) || decision.tag.includes("..")) {
-            throw new Error(`Invalid release tag: ${decision.tag}`)
-          }
+            if (!response.ok) {
+              const apiMessage = data?.error?.message || response.statusText || "unknown error"
+              throw new Error(`OpenAI API request returned ${response.status}: ${apiMessage}`)
+            }
 
-          fs.writeFileSync("release-decision.json", JSON.stringify(decision, null, 2))
-          fs.writeFileSync("release-notes.md", decision.notes + "\n")
+            const outputText = data.output_text || (data.output || [])
+              .flatMap((item) => item.content || [])
+              .find((content) => content.type === "output_text")?.text
 
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `create_release=${decision.create_release}\n`)
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=${decision.tag}\n`)
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `title=${decision.title}\n`)
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason<<REASON\n${decision.reason}\nREASON\n`)
+            if (!outputText) {
+              throw new Error(`OpenAI response did not include output text: ${JSON.stringify(data)}`)
+            }
+
+            const plan = JSON.parse(outputText)
+            plan.summary = String(plan.summary || "").trim()
+            plan.actions = Array.isArray(plan.actions) ? plan.actions : []
+
+            const tagPattern = /^v[0-9]+(\.[0-9]+){0,2}([._-][A-Za-z0-9]+)?$/
+            const seenCreateTags = new Set()
+            const normalizedActions = plan.actions.map((action) => ({
+              action: String(action.action || "").trim(),
+              tag: String(action.tag || "").trim(),
+              target_sha: String(action.target_sha || "").trim(),
+              title: String(action.title || "").replace(/\s+/g, " ").trim(),
+              notes: String(action.notes || "").trim(),
+              reason: String(action.reason || "").replace(/\s+/g, " ").trim()
+            }))
+
+            for (const action of normalizedActions) {
+              if (action.action === "skip") {
+                continue
+              }
+
+              if (action.action === "create") {
+                if (!tagPattern.test(action.tag) || action.tag.includes("..")) {
+                  throw new Error(`Invalid release tag: ${action.tag}`)
+                }
+                if (!commitShas.has(action.target_sha)) {
+                  throw new Error(`Release target is outside the reconciled history: ${action.tag} ${action.target_sha}`)
+                }
+                if (!action.title) {
+                  throw new Error(`Release title cannot be empty for ${action.tag}`)
+                }
+                if (!action.notes) {
+                  throw new Error(`Release notes cannot be empty for ${action.tag}`)
+                }
+                if (existingTags.has(action.tag)) {
+                  throw new Error(`Create action targets an existing release tag: ${action.tag}`)
+                }
+                if (seenCreateTags.has(action.tag)) {
+                  throw new Error(`Duplicate create action for tag: ${action.tag}`)
+                }
+                seenCreateTags.add(action.tag)
+              } else if (action.action === "update") {
+                if (!context.updateExisting) {
+                  action.action = "skip"
+                  action.reason = `Existing release updates are disabled. ${action.reason}`.trim()
+                  continue
+                }
+                if (!tagPattern.test(action.tag) || action.tag.includes("..")) {
+                  action.action = "skip"
+                  action.reason = `Invalid existing release tag. ${action.reason}`.trim()
+                  continue
+                }
+                if (!action.title) {
+                  action.action = "skip"
+                  action.reason = `Release title cannot be empty. ${action.reason}`.trim()
+                  continue
+                }
+                if (!action.notes) {
+                  action.action = "skip"
+                  action.reason = `Release notes cannot be empty. ${action.reason}`.trim()
+                  continue
+                }
+                const release = context.existingReleases.find((item) => item.tag === action.tag)
+                if (!release) {
+                  action.action = "skip"
+                  action.reason = `Update action targets a missing release tag. ${action.reason}`.trim()
+                  continue
+                }
+                if (!commitShas.has(action.target_sha)) {
+                  action.action = "skip"
+                  action.reason = `Release target is outside the reconciled commit window. ${action.reason}`.trim()
+                  continue
+                }
+                if (release.targetSha && release.targetSha !== action.target_sha) {
+                  action.action = "skip"
+                  action.reason = `Update action cannot move ${action.tag} from ${release.targetSha} to ${action.target_sha}. ${action.reason}`.trim()
+                }
+              } else {
+                throw new Error(`Unsupported release action: ${action.action}`)
+              }
+            }
+
+            plan.actions = normalizedActions
+            fs.writeFileSync("release-plan.json", JSON.stringify(plan, null, 2))
+
+            const createCount = plan.actions.filter((action) => action.action === "create").length
+            const updateCount = plan.actions.filter((action) => action.action === "update").length
+            let delimiter = ""
+            do {
+              delimiter = `SUMMARY_${crypto.randomBytes(12).toString("hex")}`
+            } while (plan.summary.includes(delimiter))
+
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `create_count=${createCount}\n`)
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `update_count=${updateCount}\n`)
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `summary<<${delimiter}\n${plan.summary}\n${delimiter}\n`)
+          })().catch((error) => {
+            console.error(error)
+            process.exit(1)
+          })
           NODE
 
-      - name: Publish release
-        if: steps.decide.outputs.create_release == 'true' && inputs.dry-run == false && inputs.publish == true
+      - name: Apply release reconciliation
+        id: apply
+        if: inputs.dry-run == false && inputs.publish == true
         working-directory: caller
         env:
           DEFAULT_BRANCH_INPUT: ${{ inputs.default-branch }}
           EVENT_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          PR_NUMBER: ${{ inputs.pr-number }}
-          RELEASE_SHA_INPUT: ${{ inputs.release-sha }}
-          TAG: ${{ steps.decide.outputs.tag }}
-          TITLE: ${{ steps.decide.outputs.title }}
         run: |
           set -euo pipefail
 
           default_branch="${DEFAULT_BRANCH_INPUT:-$EVENT_DEFAULT_BRANCH}"
-          release_sha="${RELEASE_SHA_INPUT:-$(git rev-parse HEAD)}"
-
-          if [[ ! "$TAG" =~ ^v[0-9]+(\.[0-9]+){0,2}([._-][A-Za-z0-9]+)?$ ]] || [[ "$TAG" == *..* ]]; then
-            printf "Invalid release tag: %s\n" "$TAG" >&2
-            exit 1
-          fi
-
-          if [[ -z "$TITLE" ]]; then
-            printf "Release title cannot be empty.\n" >&2
-            exit 1
-          fi
-
-          git fetch --force --tags origin
-
-          if git rev-parse -q --verify "refs/tags/$TAG^{commit}" >/dev/null; then
-            printf "Release tag already exists locally: %s\n" "$TAG" >&2
-            exit 1
-          fi
-
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            printf "Release tag already exists on origin: %s\n" "$TAG" >&2
+          if ! git fetch --force --tags origin; then
+            printf "Failed to fetch tags from %s.\n" "$GITHUB_REPOSITORY" >&2
             exit 1
           fi
 
           if [[ -n "$default_branch" ]]; then
-            git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"
-            git merge-base --is-ancestor "$release_sha" "origin/$default_branch"
+            if ! git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
+              printf "Failed to fetch default branch %s from %s.\n" "$default_branch" "$GITHUB_REPOSITORY" >&2
+              exit 1
+            fi
           fi
 
-          gh release create "$TAG" --target "$release_sha" --title "$TITLE" --notes-file ../release-notes.md --latest
+          node <<'NODE'
+          const cp = require("child_process")
+          const fs = require("fs")
+          const context = JSON.parse(fs.readFileSync("../release-context.json", "utf8"))
+          const plan = JSON.parse(fs.readFileSync("../release-plan.json", "utf8"))
 
-          if [[ -n "$PR_NUMBER" ]]; then
-            gh pr comment "$PR_NUMBER" --body "Auto release published ${TAG}: ${TITLE}" || true
-          fi
+          const run = (command, args) => cp.execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+          const actions = plan.actions.filter((action) => action.action === "create" || action.action === "update")
+          const applied = []
+          const failed = []
 
-      - name: Report no release
-        if: steps.decide.outputs.create_release != 'true'
+          for (const [index, action] of actions.entries()) {
+            const notesFile = `../release-notes-${index}.md`
+            fs.writeFileSync(notesFile, `${action.notes}\n`)
+
+            try {
+              run("git", ["cat-file", "-e", `${action.target_sha}^{commit}`])
+              if (process.env.DEFAULT_BRANCH_INPUT || process.env.EVENT_DEFAULT_BRANCH) {
+                const defaultBranch = process.env.DEFAULT_BRANCH_INPUT || process.env.EVENT_DEFAULT_BRANCH
+                run("git", ["merge-base", "--is-ancestor", action.target_sha, `origin/${defaultBranch}`])
+              }
+
+              if (action.action === "create") {
+                let tagSha = ""
+                try {
+                  tagSha = run("git", ["rev-list", "-n", "1", `refs/tags/${action.tag}^{}`]).trim()
+                } catch {
+                  tagSha = ""
+                }
+                if (tagSha && tagSha !== action.target_sha) {
+                  throw new Error(`Release tag ${action.tag} points to ${tagSha}, not ${action.target_sha}`)
+                }
+
+                const latestArgs = action.target_sha === context.releaseSha ? ["--latest"] : ["--latest=false"]
+                run("gh", ["release", "create", action.tag, "--target", action.target_sha, "--title", action.title, "--notes-file", notesFile, ...latestArgs])
+              } else {
+                run("gh", ["release", "edit", action.tag, "--title", action.title, "--notes-file", notesFile])
+              }
+
+              applied.push({ action: action.action, tag: action.tag, target_sha: action.target_sha })
+            } catch (error) {
+              failed.push({
+                action: action.action,
+                tag: action.tag,
+                target_sha: action.target_sha,
+                message: error.stderr?.toString().trim() || error.message
+              })
+            }
+          }
+
+          fs.writeFileSync("../release-apply-results.json", JSON.stringify({ applied, failed }, null, 2))
+          console.log(`Applied ${applied.length} release actions with ${failed.length} failures.`)
+
+          if (failed.length) {
+            for (const failure of failed) {
+              console.error(`${failure.action} ${failure.tag} failed: ${failure.message}`)
+            }
+            process.exit(1)
+          }
+          NODE
+
+      - name: Report release reconciliation
+        if: always() && steps.plan.outcome == 'success'
         working-directory: caller
         env:
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
+          CREATE_COUNT: ${{ steps.plan.outputs.create_count }}
+          DRY_RUN: ${{ inputs.dry-run }}
           PR_NUMBER: ${{ inputs.pr-number }}
-          REASON: ${{ steps.decide.outputs.reason }}
+          PUBLISH: ${{ inputs.publish }}
+          SUMMARY: ${{ steps.plan.outputs.summary }}
+          UPDATE_COUNT: ${{ steps.plan.outputs.update_count }}
         run: |
           set -euo pipefail
 
-          printf "No release published: %s\n" "$REASON"
+          printf "Release reconciliation planned %s creates and %s updates.\n" "$CREATE_COUNT" "$UPDATE_COUNT"
+          printf "%s\n" "$SUMMARY"
 
-          if [[ -n "$PR_NUMBER" ]]; then
-            gh pr comment "$PR_NUMBER" --body "Auto release checked this merge and did not publish a release: ${REASON}" || true
+          applied_count="0"
+          failed_count="0"
+          if [[ -f ../release-apply-results.json ]]; then
+            applied_count="$(node -e 'const fs=require("fs"); const data=JSON.parse(fs.readFileSync("../release-apply-results.json","utf8")); console.log((data.applied || []).length)')"
+            failed_count="$(node -e 'const fs=require("fs"); const data=JSON.parse(fs.readFileSync("../release-apply-results.json","utf8")); console.log((data.failed || []).length)')"
+            printf "Release reconciliation applied %s actions with %s failures.\n" "$applied_count" "$failed_count"
           fi
 
-      - name: Report dry run
-        if: steps.decide.outputs.create_release == 'true' && (inputs.dry-run == true || inputs.publish != true)
-        env:
-          TAG: ${{ steps.decide.outputs.tag }}
-          TITLE: ${{ steps.decide.outputs.title }}
-        run: |
-          set -euo pipefail
-          printf "Release selected but not published %s: %s\n" "$TAG" "$TITLE"
+          if [[ "$DRY_RUN" == "true" || "$PUBLISH" != "true" ]]; then
+            printf "Release reconciliation was not applied because publish=%s and dry-run=%s.\n" "$PUBLISH" "$DRY_RUN"
+          fi
+
+          if [[ -n "$PR_NUMBER" ]]; then
+            if [[ -f ../release-apply-results.json ]]; then
+              gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. Applied ${applied_count} actions with ${failed_count} failures. ${SUMMARY}" || true
+            else
+              gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. ${SUMMARY}" || true
+            fi
+          fi

@@ -39,6 +39,10 @@ permissions:
 
 jobs:
   auto-create-dev-pr:
+    concurrency:
+      group: auto-create-dev-pr-${{ github.repository }}-${{ inputs.dev-branch }}
+      cancel-in-progress: false
+
     runs-on: ubuntu-latest
 
     steps:
