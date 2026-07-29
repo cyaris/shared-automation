@@ -22,6 +22,19 @@
 - Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
 - Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
 - Keep private action and dependency access requirements documented in `README.md`. Caller repositories that check out private local dependencies need a checkout-capable `CHECKOUT_TOKEN` or `RELEASE_TOKEN`; callers that only read this public repository's reusable workflow files should not need a token for that read.
+- Downstream README files should link to this repository's workflow descriptions instead of repeating shared behavior.
+  Keep repo-specific details downstream, such as trigger branches, working directories, S3 prefixes, bundle file lists,
+  dependency refs, skipped commands, and required repository variables or secrets.
+- For auto-create-dev-pr caller README sections, describe the local trigger branch and target branch, then link to the
+  shared workflow description for behavior, inputs, and secrets.
+- For auto-release caller README sections, describe that the local workflow is manual-only and any repository-specific
+  release policy or default branch behavior, then link to the shared workflow description for reconciliation behavior,
+  inputs, and secrets.
+- For CI caller README sections, describe local triggers, working directories, skipped commands, and dependency ref
+  fallbacks, then link to the shared workflow description for validation behavior, inputs, and secrets.
+- For rollup-upload caller README sections, describe the local upload trigger, S3 destination, bundle files, production
+  or staged naming, and repository-specific dependency refs, then link to the shared workflow description for upload
+  behavior, inputs, and secrets.
 
 ## Caller Workflow Expectations
 
