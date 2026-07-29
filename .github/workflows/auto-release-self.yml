@@ -47,12 +47,12 @@ jobs:
       issues: write
       pull-requests: write
     with:
-      pr-number: ${{ inputs.pr-number }}
-      release-sha: ${{ inputs.release-sha }}
-      shared-automation-ref: ${{ inputs.shared-automation-ref || vars.SHARED_AUTOMATION_REF || 'main' }}
-      publish: ${{ inputs.publish }}
-      update-existing: ${{ inputs.update-existing }}
-      review-artifact-retention-days: ${{ inputs.review-artifact-retention-days }}
+      pr-number: ${{ github.event.inputs['pr-number'] }}
+      release-sha: ${{ github.event.inputs['release-sha'] }}
+      shared-automation-ref: ${{ github.event.inputs['shared-automation-ref'] }}
+      publish: ${{ github.event.inputs.publish == 'true' }}
+      update-existing: ${{ github.event.inputs['update-existing'] != 'false' }}
+      review-artifact-retention-days: ${{ fromJSON(github.event.inputs['review-artifact-retention-days'] || '30') }}
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
