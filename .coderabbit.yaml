@@ -1,0 +1,88 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+inheritance: true
+language: "en-US"
+
+reviews:
+  profile: "chill"
+
+  request_changes_workflow: false
+  high_level_summary: true
+  review_status: true
+  review_details: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 0
+    ignore_title_keywords:
+      - "WIP"
+      - "[skip review]"
+
+  path_filters:
+    - "!**/.DS_Store"
+
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        Focus on changes introduced by the pull request.
+
+        Prioritize:
+        - Incorrect behavior and likely runtime bugs
+        - Security vulnerabilities
+        - Broken reusable workflow contracts for downstream repositories
+        - Missing or incorrect permissions
+        - Secret handling mistakes
+        - Backward compatibility
+        - Meaningful performance problems
+        - Unnecessary complexity
+        - Missing error handling
+        - Missing documentation for workflow behavior changes
+
+        For each issue:
+        - Describe a concrete failure scenario.
+        - Explain why the issue matters.
+        - Recommend a specific correction.
+        - Distinguish blocking problems from optional improvements.
+
+        Avoid:
+        - Minor formatting comments
+        - Subjective naming preferences
+        - Suggestions already handled by formatters or linters
+        - Large refactors unrelated to the pull request
+        - Repeating the same concern in multiple comments
+
+    - path: "**/.github/workflows/*.{yml,yaml}"
+      instructions: |
+        Check for:
+        - Invalid GitHub Actions syntax
+        - Inputs, outputs, and secrets that break existing workflow_call consumers
+        - Excessive permissions or missing least-privilege permissions
+        - Unsafe use of pull_request_target
+        - Manual workflow_dispatch paths that bypass the allowed-dispatch-actor guard
+        - Unpinned third-party actions where pinning would materially reduce supply-chain risk
+        - Incorrect branch, PR, release, or concurrency behavior
+        - Checkout token usage that could expose secrets to untrusted code
+        - Missing cache or install behavior needed for clean GitHub-hosted runners
+        - Deprecated compatibility aliases that are removed without a migration path
+
+    - path: "**/.github/actions/**"
+      instructions: |
+        Check for:
+        - Composite action inputs that drift from reusable workflow callers
+        - Shell quoting, word splitting, or multiline input parsing bugs
+        - AWS, GitHub CLI, or upload commands that can write to the wrong destination
+        - Missing dry-run behavior, validation, or clear failure messages
+        - Secret values or credentials that could be printed to logs
+
+    - path: "**/*.{md,markdown}"
+      instructions: |
+        Check for:
+        - Workflow documentation that no longer matches YAML inputs, secrets, permissions, or dispatch behavior
+        - Missing documentation for new reusable workflows, inputs, secrets, or child-repo requirements
+        - Examples that still use deprecated svelte-lib workflow names instead of shared-automation names
+        - Guidance that conflicts with the main/dev branch model
+        - Broken links or stale downstream wrapper examples
+
+chat:
+  auto_reply: true
