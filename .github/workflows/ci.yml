@@ -76,7 +76,7 @@ jobs:
       - name: Checkout local dependencies
         if: inputs.local-dependency-repositories != ''
         env:
-          GH_TOKEN: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
+          FETCH_TOKEN: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
           LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.local-dependency-repositories }}
         run: |
           set -euo pipefail
@@ -96,7 +96,9 @@ jobs:
               exit 1
             fi
 
-            gh repo clone "$repository" "$path" -- --branch "$ref" --depth 1
+            auth_header="$(printf 'x-access-token:%s' "$FETCH_TOKEN" | base64 | tr -d '\n')"
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
+              clone --branch "$ref" --depth 1 "https://github.com/${repository}.git" "$path"
           done <<< "$LOCAL_DEPENDENCY_REPOSITORIES"
 
       - name: Set up Node.js
