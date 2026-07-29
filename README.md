@@ -93,11 +93,12 @@ Important inputs:
 - `dry-run` for decision reporting without applying release changes, defaulting to `false`
 - `publish` for applying selected release creates and updates, defaulting to `false`
 - `update-existing` for allowing edits to existing release titles and notes, defaulting to `true`
+- `review-artifact-retention-days` for retaining report-only plan artifacts, defaulting to `30`
 - `shared-automation-repository` and `shared-automation-ref` for the shared release policy checkout
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
-The local `.github/workflows/auto-release-self.yml` wrapper overrides `publish` and `update-existing` to `true` so
-manual runs in this repository apply the selected reconciliation by default.
+The local `.github/workflows/auto-release-self.yml` wrapper uses the reusable defaults, so manual runs in this
+repository are report-only unless `publish` is explicitly enabled.
 
 Required secret:
 
@@ -107,6 +108,14 @@ Optional secrets:
 
 - `RELEASE_TOKEN` for release and tag creation
 - `CHECKOUT_TOKEN` for reading private repositories used by the workflow
+
+Every successful planning run writes a Markdown review summary to the Actions run summary and uploads a review artifact
+named `release-review-<repo>-<sha>`. The artifact includes `release-review-summary.md`, `release-plan.json`,
+`release-context.json`, `existing-releases.raw.json`, `commits.tsv`, and `files.txt`. Multi-repository historical review
+runs should keep `publish: false`, download the review artifacts from each repository run, compare the proposed
+create/update/skip actions, then respond by updating release policy or rerunning with different inputs. GitHub Actions
+does not support editing propositions inside the running planning step; publication should be a later explicit run after
+the reviewed plan is approved.
 
 ### `.github/workflows/ci.yml`
 

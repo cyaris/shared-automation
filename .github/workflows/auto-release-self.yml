@@ -19,15 +19,20 @@ on:
         type: string
         default: ""
       publish:
-        description: Publish a selected release instead of reporting only.
+        description: Apply selected release creates and updates. Keep false to report the plan only.
         required: false
         type: boolean
-        default: true
+        default: false
       update-existing:
         description: Update existing release titles and notes.
         required: false
         type: boolean
         default: true
+      review-artifact-retention-days:
+        description: Days to retain report-only review artifacts.
+        required: false
+        type: number
+        default: 30
 
 permissions:
   contents: read
@@ -46,6 +51,7 @@ jobs:
       shared-automation-ref: ${{ inputs.shared-automation-ref || vars.SHARED_AUTOMATION_REF || 'main' }}
       publish: ${{ inputs.publish }}
       update-existing: ${{ inputs.update-existing }}
+      review-artifact-retention-days: ${{ inputs.review-artifact-retention-days }}
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}

@@ -43,6 +43,11 @@ on:
         required: false
         type: boolean
         default: true
+      review-artifact-retention-days:
+        description: Days to retain report-only review artifacts.
+        required: false
+        type: number
+        default: 30
       shared-automation-repository:
         description: Repository containing the shared release policy.
         required: false
@@ -290,6 +295,7 @@ jobs:
           fs.writeFileSync("../release-context.json", JSON.stringify(context, null, 2))
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `commit_count=${allCommits.length}\n`)
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_count=${existingReleases.length}\n`)
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_sha=${context.releaseSha}\n`)
           NODE
 
       - name: Plan release reconciliation
@@ -501,6 +507,93 @@ jobs:
             process.exit(1)
           })
           NODE
+
+      - name: Write review summary
+        if: always() && steps.plan.outcome == 'success'
+        working-directory: caller
+        env:
+          CREATE_COUNT: ${{ steps.plan.outputs.create_count }}
+          SUMMARY: ${{ steps.plan.outputs.summary }}
+          UPDATE_COUNT: ${{ steps.plan.outputs.update_count }}
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const fs = require("fs")
+          const context = JSON.parse(fs.readFileSync("../release-context.json", "utf8"))
+          const plan = JSON.parse(fs.readFileSync("../release-plan.json", "utf8"))
+          const escapeCell = (value) => String(value || "").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>")
+          const shortSha = (value) => String(value || "").slice(0, 12)
+          const counts = plan.actions.reduce((acc, action) => {
+            acc[action.action] = (acc[action.action] || 0) + 1
+            return acc
+          }, {})
+
+          const lines = [
+            `# Release Reconciliation Review: ${context.repository}`,
+            "",
+            `- Target commit: \`${context.releaseSha}\``,
+            `- Default branch: \`${context.defaultBranch || "unknown"}\``,
+            `- Existing releases: ${context.existingReleases.length}`,
+            `- Commits considered: ${context.commits.length} of ${context.commitCount}`,
+            `- Omitted commits: ${context.omittedCommitCount}`,
+            `- Changed files listed: ${context.changedFilesAtReleaseSha.length}`,
+            `- Omitted files: ${context.omittedFileCount}`,
+            `- Update existing releases: ${context.updateExisting}`,
+            "",
+            "## Plan Counts",
+            "",
+            `- Create: ${counts.create || 0}`,
+            `- Update: ${counts.update || 0}`,
+            `- Skip: ${counts.skip || 0}`,
+            "",
+            "## Summary",
+            "",
+            process.env.SUMMARY || plan.summary || "",
+            "",
+            "## Proposed Actions",
+            "",
+            "| Action | Tag | Target | Title | Reason |",
+            "| --- | --- | --- | --- | --- |"
+          ]
+
+          for (const action of plan.actions) {
+            lines.push(`| ${escapeCell(action.action)} | ${escapeCell(action.tag)} | \`${shortSha(action.target_sha)}\` | ${escapeCell(action.title)} | ${escapeCell(action.reason)} |`)
+          }
+
+          if (!plan.actions.length) {
+            lines.push("| skip |  |  | No actions proposed | No release actions were proposed |")
+          }
+
+          lines.push(
+            "",
+            "## Review Files",
+            "",
+            "- `release-plan.json` contains the normalized create/update/skip proposal.",
+            "- `release-context.json` contains the bounded repository context sent for planning.",
+            "- `existing-releases.raw.json`, `commits.tsv`, and `files.txt` contain source inventory data.",
+            "",
+            "Publication is controlled separately by `publish`; report-only runs do not create tags or releases."
+          )
+
+          fs.writeFileSync("../release-review-summary.md", `${lines.join("\n")}\n`)
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`)
+          NODE
+
+      - name: Upload review artifacts
+        if: always() && steps.plan.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-review-${{ github.event.repository.name }}-${{ steps.context.outputs.release_sha || github.sha }}
+          path: |
+            release-review-summary.md
+            release-plan.json
+            release-context.json
+            existing-releases.raw.json
+            commits.tsv
+            files.txt
+          if-no-files-found: error
+          retention-days: ${{ inputs.review-artifact-retention-days }}
 
       - name: Apply release reconciliation
         id: apply
