@@ -40,6 +40,9 @@ jobs:
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 ```
 
+The reusable job serializes runs with a repository/branch-specific concurrency group. This queues overlapping pushes
+before the pull request existence check and creation step run.
+
 Important inputs:
 
 - `default-branch`, defaulting to the caller repository default branch
