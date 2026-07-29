@@ -78,6 +78,7 @@ jobs:
     with:
       pr-number: ${{ github.event.pull_request.number }}
       release-sha: ${{ github.event.pull_request.merge_commit_sha }}
+      publish: true
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -89,7 +90,8 @@ Important inputs:
 - `release-sha`, `pr-number`, `policy-path`, and `default-branch`
 - `openai-model`, defaulting to `gpt-5-mini`
 - `dry-run` for decision reporting without publishing
-- `publish` for explicit release publication after a release is selected
+- `publish` for explicit release publication after a release is selected; caller workflows that should create releases
+  must pass `publish: true`
 - `shared-automation-repository` and `shared-automation-ref` for the shared release policy checkout
 - `svelte-lib-repository` and `svelte-lib-ref` as deprecated compatibility aliases for
   `shared-automation-repository` and `shared-automation-ref`
