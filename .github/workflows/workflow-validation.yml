@@ -24,7 +24,18 @@ permissions:
   contents: read
 
 jobs:
+  validate-manual-dispatch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate manual dispatcher
+        if: ${{ github.event_name == 'workflow_dispatch' && github.actor != 'cyaris' }}
+        run: |
+          printf "Manual dispatch is restricted to cyaris.\n" >&2
+          exit 1
+
   actionlint:
+    needs: validate-manual-dispatch
     runs-on: ubuntu-latest
 
     steps:
@@ -46,6 +57,7 @@ jobs:
           "$HOME/go/bin/actionlint" -color
 
   zizmor:
+    needs: validate-manual-dispatch
     runs-on: ubuntu-latest
 
     steps:

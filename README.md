@@ -120,8 +120,8 @@ the reviewed plan is approved.
 ### `.github/workflows/ci.yml`
 
 Reusable Node package validation workflow. It checks out the caller repository, optionally checks out and builds
-local `file:` dependency repositories, installs caller dependencies, then runs configurable format, lint, framework
-check, and build commands.
+local `file:` dependency repositories, runs `npm ci`, then runs the fixed `npm run format:check`, `npm run lint`,
+`npm run check`, and `npm run build` scripts unless the matching `run-*` flag disables that step.
 
 Typical caller wrapper:
 
