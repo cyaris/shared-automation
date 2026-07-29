@@ -34,11 +34,6 @@ on:
         type: number
         default: 30
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-
 jobs:
   auto-release:
     uses: ./.github/workflows/auto-release.yml
