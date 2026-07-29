@@ -45,7 +45,12 @@
 ## Caller Workflow Expectations
 
 - Caller repositories should keep root `CI`, `Rollup upload`, `Auto-create dev pull request`, and `Auto release` workflows as thin callers of this repository's reusable workflows whenever those shared workflows cover the needed behavior.
-- For rollup upload callers, preserve automatic production uploads on pushes to `main` or `master`; manual dispatch should keep staged uploads as the default unless `production` is explicitly selected.
+- Workflows must fail clearly when a requested feature requires credentials, secrets, repository variables, external
+  permissions, or paid services that are not configured. Apply this to dry-run modes too: a dry run may avoid external
+  writes, but it should still prove that required credentials exist unless the feature is explicitly documented as
+  credential-optional.
+- For rollup upload callers, pushes to `main` or `master` should run production uploads. Manual dispatch should keep
+  staged uploads as the default unless `production` is explicitly selected.
 
 ## Workflow Validation And Security
 

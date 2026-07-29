@@ -107,12 +107,14 @@ runs:
           if [[ -z "$CHECKOUT_TOKEN" ]]; then
             git clone --depth 1 --branch "$ref" "https://github.com/${repository}.git" "$checkout_path"
           else
-            git clone \
+            auth_header="$(printf 'x-access-token:%s' "$CHECKOUT_TOKEN" | base64 | tr -d '\n')"
+            git \
+              -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
+              clone \
               --depth 1 \
               --branch "$ref" \
-              "https://x-access-token:${CHECKOUT_TOKEN}@github.com/${repository}.git" \
+              "https://github.com/${repository}.git" \
               "$checkout_path"
-            git -C "$checkout_path" remote set-url origin "https://github.com/${repository}.git"
           fi
         done <<< "$LOCAL_DEPENDENCY_REPOSITORIES"
 
@@ -162,6 +164,20 @@ runs:
       working-directory: ${{ inputs.caller-repository-name }}/${{ inputs.working-directory }}
       shell: bash
       run: npm run rollup
+
+    - name: Validate AWS credential inputs
+      env:
+        AWS_ACCESS_KEY_ID_INPUT: ${{ inputs.aws-access-key-id }}
+        AWS_ROLE_TO_ASSUME: ${{ inputs.aws-role-to-assume }}
+        AWS_SECRET_ACCESS_KEY_INPUT: ${{ inputs.aws-secret-access-key }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if [[ -z "$AWS_ROLE_TO_ASSUME" && ( -z "$AWS_ACCESS_KEY_ID_INPUT" || -z "$AWS_SECRET_ACCESS_KEY_INPUT" ) ]]; then
+          printf "Rollup uploads require aws-role-to-assume or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.\n" >&2
+          exit 1
+        fi
 
     - name: Configure AWS credentials with OIDC role
       if: inputs.aws-role-to-assume != ''
