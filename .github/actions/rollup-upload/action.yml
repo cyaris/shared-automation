@@ -117,7 +117,7 @@ runs:
         done <<< "$LOCAL_DEPENDENCY_REPOSITORIES"
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
       with:
         node-version: ${{ inputs.node-version }}
         package-manager-cache: false
@@ -165,14 +165,14 @@ runs:
 
     - name: Configure AWS credentials with OIDC role
       if: inputs.aws-role-to-assume != ''
-      uses: aws-actions/configure-aws-credentials@v6
+      uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
       with:
         aws-region: ${{ inputs.aws-region }}
         role-to-assume: ${{ inputs.aws-role-to-assume }}
 
     - name: Configure AWS credentials with access keys
       if: inputs.aws-role-to-assume == ''
-      uses: aws-actions/configure-aws-credentials@v6
+      uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
       with:
         aws-region: ${{ inputs.aws-region }}
         aws-access-key-id: ${{ inputs.aws-access-key-id }}

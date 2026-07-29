@@ -1,0 +1,65 @@
+name: Workflow validation
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - ".github/actions/**"
+      - ".github/workflows/**"
+      - ".github/release-policy.yml"
+      - "AGENTS.md"
+      - "README.md"
+  pull_request:
+    paths:
+      - ".github/actions/**"
+      - ".github/workflows/**"
+      - ".github/release-policy.yml"
+      - "AGENTS.md"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: stable
+
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+      - name: Run actionlint
+        run: |
+          "$HOME/go/bin/actionlint" -color
+
+  zizmor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install zizmor
+        run: |
+          python3 -m pip install --user zizmor==1.28.0
+          printf "%s/.local/bin\n" "$HOME" >> "$GITHUB_PATH"
+
+      - name: Run zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: zizmor --format=github .

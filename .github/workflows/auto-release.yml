@@ -53,16 +53,6 @@ on:
         required: false
         type: string
         default: ""
-      svelte-lib-repository:
-        description: Deprecated compatibility alias for shared-automation-repository.
-        required: false
-        type: string
-        default: ""
-      svelte-lib-ref:
-        description: Deprecated compatibility alias for shared-automation-ref.
-        required: false
-        type: string
-        default: ""
       allowed-dispatch-actor:
         description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
         required: false
@@ -116,23 +106,24 @@ jobs:
           fi
 
       - name: Checkout caller repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           path: caller
+          persist-credentials: false
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - name: Checkout shared release policy
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          repository: ${{ inputs.shared-automation-repository || inputs.svelte-lib-repository || 'cyaris/shared-automation' }}
-          ref: ${{ inputs.shared-automation-ref || inputs.svelte-lib-ref || 'main' }}
+          repository: ${{ inputs.shared-automation-repository || 'cyaris/shared-automation' }}
+          ref: ${{ inputs.shared-automation-ref || 'main' }}
           path: shared-automation
           persist-credentials: false
           token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "24"
 
@@ -142,20 +133,27 @@ jobs:
         env:
           DEFAULT_BRANCH_INPUT: ${{ inputs.default-branch }}
           EVENT_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          FETCH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           POLICY_PATH: ${{ inputs.policy-path }}
           RELEASE_SHA_INPUT: ${{ inputs.release-sha }}
           UPDATE_EXISTING: ${{ inputs.update-existing }}
         run: |
           set -euo pipefail
 
+          git_fetch_origin() {
+            local auth_header
+            auth_header="$(printf 'x-access-token:%s' "$FETCH_TOKEN" | base64 | tr -d '\n')"
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" fetch "$@"
+          }
+
           default_branch="${DEFAULT_BRANCH_INPUT:-$EVENT_DEFAULT_BRANCH}"
-          if ! git fetch --force --tags origin; then
+          if ! git_fetch_origin --force --tags origin; then
             printf "Failed to fetch tags from %s.\n" "$GITHUB_REPOSITORY" >&2
             exit 1
           fi
 
           if [[ -n "$default_branch" ]]; then
-            if ! git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
+            if ! git_fetch_origin --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
               printf "Failed to fetch default branch %s from %s.\n" "$default_branch" "$GITHUB_REPOSITORY" >&2
               exit 1
             fi
@@ -171,7 +169,7 @@ jobs:
           fi
 
           if ! git cat-file -e "${release_sha}^{commit}" 2>/dev/null; then
-            if ! git fetch --force origin "$release_sha"; then
+            if ! git_fetch_origin --force origin "$release_sha"; then
               printf "Failed to fetch release_sha %s from %s.\n" "$release_sha" "$GITHUB_REPOSITORY" >&2
               exit 1
             fi
@@ -511,17 +509,24 @@ jobs:
         env:
           DEFAULT_BRANCH_INPUT: ${{ inputs.default-branch }}
           EVENT_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          FETCH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
         run: |
           set -euo pipefail
 
+          git_fetch_origin() {
+            local auth_header
+            auth_header="$(printf 'x-access-token:%s' "$FETCH_TOKEN" | base64 | tr -d '\n')"
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" fetch "$@"
+          }
+
           default_branch="${DEFAULT_BRANCH_INPUT:-$EVENT_DEFAULT_BRANCH}"
-          if ! git fetch --force --tags origin; then
+          if ! git_fetch_origin --force --tags origin; then
             printf "Failed to fetch tags from %s.\n" "$GITHUB_REPOSITORY" >&2
             exit 1
           fi
 
           if [[ -n "$default_branch" ]]; then
-            if ! git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
+            if ! git_fetch_origin --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
               printf "Failed to fetch default branch %s from %s.\n" "$default_branch" "$GITHUB_REPOSITORY" >&2
               exit 1
             fi

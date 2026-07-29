@@ -5,8 +5,6 @@ Shared GitHub Actions workflows and automation used across cyaris repositories.
 This repository is the neutral home for reusable workflow implementations that should not live in an application or
 library repository. Downstream repositories should keep thin local wrapper workflows that define when the workflow runs,
 then call the reusable implementation here with `uses: cyaris/shared-automation/.github/workflows/<workflow>.yml@main`.
-This repository is public, so child repositories do not need a private checkout token just to read these reusable
-workflow files.
 
 Manual `workflow_dispatch` runs are guarded by the reusable workflow implementations. By default, they only allow the
 `cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
@@ -29,6 +27,10 @@ on:
     branches:
       - dev
 
+concurrency:
+  group: auto-create-dev-pr-${{ github.repository }}-dev
+  cancel-in-progress: false
+
 permissions:
   contents: read
   pull-requests: write
@@ -36,12 +38,11 @@ permissions:
 jobs:
   auto-create-dev-pr:
     uses: cyaris/shared-automation/.github/workflows/auto-create-dev-pr.yml@main
-    secrets:
-      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 ```
 
 The reusable job serializes runs with a repository/branch-specific concurrency group. This queues overlapping pushes
-before the pull request existence check and creation step run.
+before the pull request existence check and creation step run. Caller workflows may also declare their own concurrency
+group for the triggering branch when they want the entire wrapper run serialized.
 
 Important inputs:
 
@@ -57,7 +58,7 @@ Optional secret:
 ### `.github/workflows/auto-create-dev-pr-self.yml`
 
 Local workflow for this repository. It runs on pushes to `dev`, then delegates pull request creation to
-`.github/workflows/auto-create-dev-pr.yml`.
+`.github/workflows/auto-create-dev-pr.yml`. It queues overlapping `dev` pushes at the workflow level.
 
 ### `.github/workflows/auto-release-self.yml`
 
@@ -82,7 +83,7 @@ jobs:
       issues: write
       pull-requests: write
     with:
-      publish: true
+      publish: false
       update-existing: true
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -98,8 +99,6 @@ Important inputs:
 - `publish` for applying selected release creates and updates, defaulting to `false`
 - `update-existing` for allowing edits to existing release titles and notes, defaulting to `true`
 - `shared-automation-repository` and `shared-automation-ref` for the shared release policy checkout
-- `svelte-lib-repository` and `svelte-lib-ref` as deprecated compatibility aliases for
-  `shared-automation-repository` and `shared-automation-ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
 The local `.github/workflows/auto-release-self.yml` wrapper overrides `publish` and `update-existing` to `true` so
@@ -111,7 +110,7 @@ Required secret:
 
 Optional secrets:
 
-- `RELEASE_TOKEN` for release and tag creation when broader permissions are needed
+- `RELEASE_TOKEN` for release and tag creation
 - `CHECKOUT_TOKEN` for reading private repositories used by the workflow
 
 ### `.github/workflows/ci.yml`
@@ -143,8 +142,8 @@ jobs:
 
 Important inputs:
 
-- `working-directory`, `node-version`, and `install-command`
-- `format-command`, `lint-command`, `check-command`, and `build-command`; set any command to an empty string to skip it
+- `working-directory` and `node-version`
+- `run-format`, `run-lint`, `run-check`, and `run-build`; set a flag to `false` to skip that standard npm script
 - optional `local-dependency-repositories` entries as `owner/repo:path:ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
@@ -154,7 +153,12 @@ This keeps local `file:` dependencies usable even when generated `dist/` output 
 Optional secret:
 
 - `CHECKOUT_TOKEN` for reading private dependency repositories
-- `RELEASE_TOKEN` as a checkout fallback when `CHECKOUT_TOKEN` is not configured
+
+### `.github/workflows/workflow-validation.yml`
+
+Local workflow for this repository. It runs on changes to workflow, composite-action, release-policy, and automation
+documentation files, then validates GitHub Actions syntax with `actionlint` and audits workflow security with `zizmor`.
+The workflow can also be manually dispatched.
 
 ### `.github/workflows/rollup-upload.yml`
 
@@ -179,12 +183,10 @@ Important inputs:
 Optional secrets:
 
 - `CHECKOUT_TOKEN` for reading private dependency repositories
-- `RELEASE_TOKEN` as a checkout fallback when `CHECKOUT_TOKEN` is not configured
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` when `aws-role-to-assume` is omitted
 
-Private dependency note: callers that install private repositories such as `cyaris/svelte-lib` through local `file:`
-dependencies must pass a checkout-capable `CHECKOUT_TOKEN` or `RELEASE_TOKEN`. Callers that only read the reusable
-workflow files from this public repository do not need a token for that read.
+Private dependency note: callers that install private repositories through local `file:` dependencies need a
+checkout-capable token.
 
 ## Branch Model
 
