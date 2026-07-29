@@ -65,8 +65,8 @@ on:
         default: cyaris
     secrets:
       OPENAI_API_KEY:
-        description: Optional OpenAI API key used for automated release decisions.
-        required: false
+        description: OpenAI API key used for automated release decisions.
+        required: true
       RELEASE_TOKEN:
         description: Optional token with permission to create releases and tags.
         required: false
@@ -100,21 +100,17 @@ jobs:
           exit 1
 
       - name: Check release decision credentials
-        id: release-credentials
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           set -euo pipefail
 
-          if [[ -n "$OPENAI_API_KEY" ]]; then
-            printf "available=true\n" >> "$GITHUB_OUTPUT"
-          else
-            printf "available=false\n" >> "$GITHUB_OUTPUT"
-            printf "OPENAI_API_KEY is not configured; skipping release decision.\n"
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            printf "OPENAI_API_KEY is required for auto-release decisions.\n" >&2
+            exit 1
           fi
 
       - name: Checkout caller repository
-        if: steps.release-credentials.outputs.available == 'true'
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -123,7 +119,6 @@ jobs:
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - name: Checkout shared release policy
-        if: steps.release-credentials.outputs.available == 'true'
         uses: actions/checkout@v6
         with:
           repository: ${{ inputs.shared-automation-repository || inputs.svelte-lib-repository || 'cyaris/shared-automation' }}
@@ -133,13 +128,11 @@ jobs:
           token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
 
       - name: Set up Node.js
-        if: steps.release-credentials.outputs.available == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: "24"
 
       - name: Gather release context
-        if: steps.release-credentials.outputs.available == 'true'
         id: context
         working-directory: caller
         env:
@@ -220,7 +213,6 @@ jobs:
           NODE
 
       - name: Decide release
-        if: steps.release-credentials.outputs.available == 'true'
         id: decide
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -393,7 +385,7 @@ jobs:
           fi
 
       - name: Report no release
-        if: steps.release-credentials.outputs.available == 'true' && steps.decide.outputs.create_release != 'true'
+        if: steps.decide.outputs.create_release != 'true'
         working-directory: caller
         env:
           PR_NUMBER: ${{ inputs.pr-number }}
@@ -415,8 +407,3 @@ jobs:
         run: |
           set -euo pipefail
           printf "Release selected but not published %s: %s\n" "$TAG" "$TITLE"
-
-      - name: Report skipped release decision
-        if: steps.release-credentials.outputs.available != 'true'
-        run: |
-          printf "Auto release skipped because OPENAI_API_KEY is not configured.\n"
