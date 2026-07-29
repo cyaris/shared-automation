@@ -82,7 +82,7 @@ on:
 permissions:
   contents: write
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: auto-release-${{ github.repository }}-${{ inputs.release-sha || github.sha }}
@@ -120,7 +120,6 @@ jobs:
         with:
           fetch-depth: 0
           path: caller
-          persist-credentials: false
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - name: Checkout shared release policy
@@ -150,9 +149,16 @@ jobs:
           set -euo pipefail
 
           default_branch="${DEFAULT_BRANCH_INPUT:-$EVENT_DEFAULT_BRANCH}"
-          git fetch --force --tags origin
+          if ! git fetch --force --tags origin; then
+            printf "Failed to fetch tags from %s.\n" "$GITHUB_REPOSITORY" >&2
+            exit 1
+          fi
+
           if [[ -n "$default_branch" ]]; then
-            git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"
+            if ! git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
+              printf "Failed to fetch default branch %s from %s.\n" "$default_branch" "$GITHUB_REPOSITORY" >&2
+              exit 1
+            fi
           fi
 
           release_sha="$RELEASE_SHA_INPUT"
@@ -165,11 +171,17 @@ jobs:
           fi
 
           if ! git cat-file -e "${release_sha}^{commit}" 2>/dev/null; then
-            git fetch --force origin "$release_sha"
+            if ! git fetch --force origin "$release_sha"; then
+              printf "Failed to fetch release_sha %s from %s.\n" "$release_sha" "$GITHUB_REPOSITORY" >&2
+              exit 1
+            fi
           fi
 
           if [[ -n "$default_branch" ]]; then
-            git merge-base --is-ancestor "$release_sha" "origin/$default_branch"
+            if ! git merge-base --is-ancestor "$release_sha" "origin/$default_branch"; then
+              printf "release_sha %s is not an ancestor of origin/%s.\n" "$release_sha" "$default_branch" >&2
+              exit 1
+            fi
           fi
 
           git log --reverse --date=short --format="%H%x09%h%x09%ad%x09%s" "$release_sha" -- > ../commits.tsv
@@ -195,11 +207,13 @@ jobs:
           const git = (args) =>
             cp.execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()
 
+          const maxCommits = 1000
+          const maxFiles = 1000
           const commitLines = read("../commits.tsv")
             .split("\n")
             .filter(Boolean)
 
-          const commits = commitLines.map((line, index) => {
+          const allCommits = commitLines.map((line, index) => {
             const [sha, shortSha, date, ...subjectParts] = line.split("\t")
             return {
               index: index + 1,
@@ -209,6 +223,7 @@ jobs:
               subject: subjectParts.join("\t")
             }
           })
+          const commitIndexBySha = new Map(allCommits.map((commit, index) => [commit.sha, index]))
 
           const releasePages = JSON.parse(read("../existing-releases.raw.json") || "[]")
           const rawReleases = releasePages.flat()
@@ -238,10 +253,18 @@ jobs:
               }
             })
             .sort((a, b) => {
-              const aIndex = commits.findIndex((commit) => commit.sha === a.targetSha)
-              const bIndex = commits.findIndex((commit) => commit.sha === b.targetSha)
+              const aIndex = commitIndexBySha.has(a.targetSha) ? commitIndexBySha.get(a.targetSha) : -1
+              const bIndex = commitIndexBySha.has(b.targetSha) ? commitIndexBySha.get(b.targetSha) : -1
               return (aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex) - (bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex)
             })
+
+          const releaseIndexes = existingReleases
+            .map((release) => commitIndexBySha.get(release.targetSha))
+            .filter((index) => Number.isInteger(index))
+          const oldestReleaseIndex = releaseIndexes.length ? Math.min(...releaseIndexes) : Math.max(0, allCommits.length - maxCommits)
+          const commitsSinceOldestRelease = allCommits.slice(oldestReleaseIndex)
+          const commits = commitsSinceOldestRelease.slice(-maxCommits)
+          const allFiles = read("../files.txt").split("\n").filter(Boolean)
 
           const context = {
             repository: process.env.GITHUB_REPOSITORY,
@@ -249,16 +272,25 @@ jobs:
             releaseSha: process.env.RELEASE_SHA || "",
             policyPath: process.env.POLICY_PATH,
             updateExisting: process.env.UPDATE_EXISTING === "true",
+            commitCount: allCommits.length,
+            omittedCommitCount: allCommits.length - commits.length,
+            commitWindow: {
+              maxCommits,
+              startIndex: commits.length ? commits[0].index : 0,
+              endIndex: commits.length ? commits[commits.length - 1].index : 0,
+              includesCommitsSinceOldestExistingReleaseTarget: releaseIndexes.length > 0 && commitsSinceOldestRelease.length <= maxCommits
+            },
             basePolicy: read("../shared-automation/.github/release-policy.yml"),
             localPolicy: read(process.env.POLICY_PATH),
             agentsGuidance: read("AGENTS.md", 24000),
             existingReleases,
             commits,
-            changedFilesAtReleaseSha: read("../files.txt").split("\n").filter(Boolean)
+            changedFilesAtReleaseSha: allFiles.slice(0, maxFiles),
+            omittedFileCount: Math.max(0, allFiles.length - maxFiles)
           }
 
           fs.writeFileSync("../release-context.json", JSON.stringify(context, null, 2))
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `commit_count=${commits.length}\n`)
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `commit_count=${allCommits.length}\n`)
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_count=${existingReleases.length}\n`)
           NODE
 
@@ -271,6 +303,7 @@ jobs:
           set -euo pipefail
 
           node <<'NODE'
+          const crypto = require("crypto")
           const fs = require("fs")
 
           ;(async () => {
@@ -391,20 +424,19 @@ jobs:
                 continue
               }
 
-              if (!tagPattern.test(action.tag) || action.tag.includes("..")) {
-                throw new Error(`Invalid release tag: ${action.tag}`)
-              }
-              if (!commitShas.has(action.target_sha)) {
-                throw new Error(`Release target is outside the reconciled history: ${action.tag} ${action.target_sha}`)
-              }
-              if (!action.title) {
-                throw new Error(`Release title cannot be empty for ${action.tag}`)
-              }
-              if (!action.notes) {
-                throw new Error(`Release notes cannot be empty for ${action.tag}`)
-              }
-
               if (action.action === "create") {
+                if (!tagPattern.test(action.tag) || action.tag.includes("..")) {
+                  throw new Error(`Invalid release tag: ${action.tag}`)
+                }
+                if (!commitShas.has(action.target_sha)) {
+                  throw new Error(`Release target is outside the reconciled history: ${action.tag} ${action.target_sha}`)
+                }
+                if (!action.title) {
+                  throw new Error(`Release title cannot be empty for ${action.tag}`)
+                }
+                if (!action.notes) {
+                  throw new Error(`Release notes cannot be empty for ${action.tag}`)
+                }
                 if (existingTags.has(action.tag)) {
                   throw new Error(`Create action targets an existing release tag: ${action.tag}`)
                 }
@@ -413,16 +445,40 @@ jobs:
                 }
                 seenCreateTags.add(action.tag)
               } else if (action.action === "update") {
-                const release = context.existingReleases.find((item) => item.tag === action.tag)
-                if (!release) {
-                  throw new Error(`Update action targets a missing release tag: ${action.tag}`)
-                }
-                if (release.targetSha && release.targetSha !== action.target_sha) {
-                  throw new Error(`Update action cannot move ${action.tag} from ${release.targetSha} to ${action.target_sha}`)
-                }
                 if (!context.updateExisting) {
                   action.action = "skip"
                   action.reason = `Existing release updates are disabled. ${action.reason}`.trim()
+                  continue
+                }
+                if (!tagPattern.test(action.tag) || action.tag.includes("..")) {
+                  action.action = "skip"
+                  action.reason = `Invalid existing release tag. ${action.reason}`.trim()
+                  continue
+                }
+                if (!action.title) {
+                  action.action = "skip"
+                  action.reason = `Release title cannot be empty. ${action.reason}`.trim()
+                  continue
+                }
+                if (!action.notes) {
+                  action.action = "skip"
+                  action.reason = `Release notes cannot be empty. ${action.reason}`.trim()
+                  continue
+                }
+                const release = context.existingReleases.find((item) => item.tag === action.tag)
+                if (!release) {
+                  action.action = "skip"
+                  action.reason = `Update action targets a missing release tag. ${action.reason}`.trim()
+                  continue
+                }
+                if (!commitShas.has(action.target_sha)) {
+                  action.action = "skip"
+                  action.reason = `Release target is outside the reconciled commit window. ${action.reason}`.trim()
+                  continue
+                }
+                if (release.targetSha && release.targetSha !== action.target_sha) {
+                  action.action = "skip"
+                  action.reason = `Update action cannot move ${action.tag} from ${release.targetSha} to ${action.target_sha}. ${action.reason}`.trim()
                 }
               } else {
                 throw new Error(`Unsupported release action: ${action.action}`)
@@ -434,9 +490,14 @@ jobs:
 
             const createCount = plan.actions.filter((action) => action.action === "create").length
             const updateCount = plan.actions.filter((action) => action.action === "update").length
+            let delimiter = ""
+            do {
+              delimiter = `SUMMARY_${crypto.randomBytes(12).toString("hex")}`
+            } while (plan.summary.includes(delimiter))
+
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `create_count=${createCount}\n`)
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `update_count=${updateCount}\n`)
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, `summary<<SUMMARY\n${plan.summary}\nSUMMARY\n`)
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `summary<<${delimiter}\n${plan.summary}\n${delimiter}\n`)
           })().catch((error) => {
             console.error(error)
             process.exit(1)
@@ -444,6 +505,7 @@ jobs:
           NODE
 
       - name: Apply release reconciliation
+        id: apply
         if: inputs.dry-run == false && inputs.publish == true
         working-directory: caller
         env:
@@ -453,50 +515,84 @@ jobs:
           set -euo pipefail
 
           default_branch="${DEFAULT_BRANCH_INPUT:-$EVENT_DEFAULT_BRANCH}"
-          git fetch --force --tags origin
-          if [[ -n "$default_branch" ]]; then
-            git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"
+          if ! git fetch --force --tags origin; then
+            printf "Failed to fetch tags from %s.\n" "$GITHUB_REPOSITORY" >&2
+            exit 1
           fi
 
-          node <<'NODE' > ../release-apply-commands.sh
+          if [[ -n "$default_branch" ]]; then
+            if ! git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
+              printf "Failed to fetch default branch %s from %s.\n" "$default_branch" "$GITHUB_REPOSITORY" >&2
+              exit 1
+            fi
+          fi
+
+          node <<'NODE'
+          const cp = require("child_process")
           const fs = require("fs")
+          const context = JSON.parse(fs.readFileSync("../release-context.json", "utf8"))
           const plan = JSON.parse(fs.readFileSync("../release-plan.json", "utf8"))
 
-          const shellQuote = (value) => `'${String(value).replace(/'/g, "'\\''")}'`
+          const run = (command, args) => cp.execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
           const actions = plan.actions.filter((action) => action.action === "create" || action.action === "update")
+          const applied = []
+          const failed = []
 
-          console.log("set -euo pipefail")
           for (const [index, action] of actions.entries()) {
             const notesFile = `../release-notes-${index}.md`
             fs.writeFileSync(notesFile, `${action.notes}\n`)
 
-            console.log(`git cat-file -e ${shellQuote(`${action.target_sha}^{commit}`)}`)
-            if (process.env.DEFAULT_BRANCH_INPUT || process.env.EVENT_DEFAULT_BRANCH) {
-              const defaultBranch = process.env.DEFAULT_BRANCH_INPUT || process.env.EVENT_DEFAULT_BRANCH
-              console.log(`git merge-base --is-ancestor ${shellQuote(action.target_sha)} ${shellQuote(`origin/${defaultBranch}`)}`)
-            }
+            try {
+              run("git", ["cat-file", "-e", `${action.target_sha}^{commit}`])
+              if (process.env.DEFAULT_BRANCH_INPUT || process.env.EVENT_DEFAULT_BRANCH) {
+                const defaultBranch = process.env.DEFAULT_BRANCH_INPUT || process.env.EVENT_DEFAULT_BRANCH
+                run("git", ["merge-base", "--is-ancestor", action.target_sha, `origin/${defaultBranch}`])
+              }
 
-            if (action.action === "create") {
-              console.log(`if git rev-parse -q --verify ${shellQuote(`refs/tags/${action.tag}^{commit}`)} >/dev/null; then`)
-              console.log(`  tag_sha="$(git rev-list -n 1 ${shellQuote(`refs/tags/${action.tag}^{}`)})"`)
-              console.log(`  if [[ "$tag_sha" != ${shellQuote(action.target_sha)} ]]; then`)
-              console.log(`    printf "Release tag %s points to %s, not %s\\n" ${shellQuote(action.tag)} "$tag_sha" ${shellQuote(action.target_sha)} >&2`)
-              console.log("    exit 1")
-              console.log("  fi")
-              console.log("fi")
-              console.log(`gh release create ${shellQuote(action.tag)} --target ${shellQuote(action.target_sha)} --title ${shellQuote(action.title)} --notes-file ${shellQuote(notesFile)} --latest=false`)
-            } else {
-              console.log(`gh release edit ${shellQuote(action.tag)} --title ${shellQuote(action.title)} --notes-file ${shellQuote(notesFile)}`)
+              if (action.action === "create") {
+                let tagSha = ""
+                try {
+                  tagSha = run("git", ["rev-list", "-n", "1", `refs/tags/${action.tag}^{}`]).trim()
+                } catch {
+                  tagSha = ""
+                }
+                if (tagSha && tagSha !== action.target_sha) {
+                  throw new Error(`Release tag ${action.tag} points to ${tagSha}, not ${action.target_sha}`)
+                }
+
+                const latestArgs = action.target_sha === context.releaseSha ? ["--latest"] : ["--latest=false"]
+                run("gh", ["release", "create", action.tag, "--target", action.target_sha, "--title", action.title, "--notes-file", notesFile, ...latestArgs])
+              } else {
+                run("gh", ["release", "edit", action.tag, "--title", action.title, "--notes-file", notesFile])
+              }
+
+              applied.push({ action: action.action, tag: action.tag, target_sha: action.target_sha })
+            } catch (error) {
+              failed.push({
+                action: action.action,
+                tag: action.tag,
+                target_sha: action.target_sha,
+                message: error.stderr?.toString().trim() || error.message
+              })
             }
           }
-          NODE
 
-          bash ../release-apply-commands.sh
+          fs.writeFileSync("../release-apply-results.json", JSON.stringify({ applied, failed }, null, 2))
+          console.log(`Applied ${applied.length} release actions with ${failed.length} failures.`)
+
+          if (failed.length) {
+            for (const failure of failed) {
+              console.error(`${failure.action} ${failure.tag} failed: ${failure.message}`)
+            }
+            process.exit(1)
+          }
+          NODE
 
       - name: Report release reconciliation
         if: always() && steps.plan.outcome == 'success'
         working-directory: caller
         env:
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
           CREATE_COUNT: ${{ steps.plan.outputs.create_count }}
           DRY_RUN: ${{ inputs.dry-run }}
           PR_NUMBER: ${{ inputs.pr-number }}
@@ -509,10 +605,22 @@ jobs:
           printf "Release reconciliation planned %s creates and %s updates.\n" "$CREATE_COUNT" "$UPDATE_COUNT"
           printf "%s\n" "$SUMMARY"
 
+          applied_count="0"
+          failed_count="0"
+          if [[ -f ../release-apply-results.json ]]; then
+            applied_count="$(node -e 'const fs=require("fs"); const data=JSON.parse(fs.readFileSync("../release-apply-results.json","utf8")); console.log((data.applied || []).length)')"
+            failed_count="$(node -e 'const fs=require("fs"); const data=JSON.parse(fs.readFileSync("../release-apply-results.json","utf8")); console.log((data.failed || []).length)')"
+            printf "Release reconciliation applied %s actions with %s failures.\n" "$applied_count" "$failed_count"
+          fi
+
           if [[ "$DRY_RUN" == "true" || "$PUBLISH" != "true" ]]; then
             printf "Release reconciliation was not applied because publish=%s and dry-run=%s.\n" "$PUBLISH" "$DRY_RUN"
           fi
 
           if [[ -n "$PR_NUMBER" ]]; then
-            gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. ${SUMMARY}" || true
+            if [[ -f ../release-apply-results.json ]]; then
+              gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. Applied ${applied_count} actions with ${failed_count} failures. ${SUMMARY}" || true
+            else
+              gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. ${SUMMARY}" || true
+            fi
           fi

@@ -77,6 +77,10 @@ Typical caller wrapper:
 jobs:
   auto-release:
     uses: cyaris/shared-automation/.github/workflows/auto-release.yml@main
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     with:
       publish: true
       update-existing: true
@@ -90,13 +94,16 @@ Important inputs:
 
 - `release-sha`, `pr-number`, `policy-path`, and `default-branch`
 - `openai-model`, defaulting to `gpt-5-mini`
-- `dry-run` for decision reporting without applying release changes
-- `publish` for applying selected release creates and updates
-- `update-existing` for allowing edits to existing release titles and notes
+- `dry-run` for decision reporting without applying release changes, defaulting to `false`
+- `publish` for applying selected release creates and updates, defaulting to `false`
+- `update-existing` for allowing edits to existing release titles and notes, defaulting to `true`
 - `shared-automation-repository` and `shared-automation-ref` for the shared release policy checkout
 - `svelte-lib-repository` and `svelte-lib-ref` as deprecated compatibility aliases for
   `shared-automation-repository` and `shared-automation-ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
+
+The local `.github/workflows/auto-release-self.yml` wrapper overrides `publish` and `update-existing` to `true` so
+manual runs in this repository apply the selected reconciliation by default.
 
 Required secret:
 
