@@ -232,6 +232,26 @@ jobs:
           const fs = require("fs")
 
           ;(async () => {
+            const writeDecision = (decision) => {
+              fs.writeFileSync("release-decision.json", JSON.stringify(decision, null, 2))
+              fs.writeFileSync("release-notes.md", decision.notes + "\n")
+
+              fs.appendFileSync(process.env.GITHUB_OUTPUT, `create_release=${decision.create_release}\n`)
+              fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag<<TAG\n${decision.tag}\nTAG\n`)
+              fs.appendFileSync(process.env.GITHUB_OUTPUT, `title<<TITLE\n${decision.title}\nTITLE\n`)
+              fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason<<REASON\n${decision.reason}\nREASON\n`)
+            }
+
+            const writeNoRelease = (reason) => {
+              writeDecision({
+                create_release: false,
+                tag: "",
+                title: "",
+                notes: "",
+                reason: String(reason || "Release decision was not available.").replace(/\s+/g, " ").trim()
+              })
+            }
+
             const context = JSON.parse(fs.readFileSync("release-context.json", "utf8"))
             const schema = {
               type: "object",
@@ -285,13 +305,25 @@ jobs:
                 body: JSON.stringify(body),
                 signal: controller.signal
               })
+            } catch (error) {
+              writeNoRelease(`OpenAI API request could not be completed: ${error.message}`)
+              return
             } finally {
               clearTimeout(timeout)
             }
 
-            const data = await response.json()
+            const responseText = await response.text()
+            let data
+            try {
+              data = responseText ? JSON.parse(responseText) : {}
+            } catch {
+              data = { raw: responseText.slice(0, 1000) }
+            }
+
             if (!response.ok) {
-              throw new Error(`OpenAI API request failed: ${response.status} ${JSON.stringify(data)}`)
+              const apiMessage = data?.error?.message || response.statusText || "unknown error"
+              writeNoRelease(`OpenAI API request returned ${response.status}: ${apiMessage}`)
+              return
             }
 
             const outputText = data.output_text || (data.output || [])
@@ -316,13 +348,7 @@ jobs:
               throw new Error(`Invalid release tag: ${decision.tag}`)
             }
 
-            fs.writeFileSync("release-decision.json", JSON.stringify(decision, null, 2))
-            fs.writeFileSync("release-notes.md", decision.notes + "\n")
-
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, `create_release=${decision.create_release}\n`)
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag<<TAG\n${decision.tag}\nTAG\n`)
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, `title<<TITLE\n${decision.title}\nTITLE\n`)
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason<<REASON\n${decision.reason}\nREASON\n`)
+            writeDecision(decision)
           })().catch((error) => {
             console.error(error)
             process.exit(1)
