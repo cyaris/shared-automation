@@ -45,7 +45,9 @@
 ## Caller Workflow Expectations
 
 - Caller repositories should keep root `CI`, `Rollup upload`, `Auto-create dev pull request`, and `Auto release` workflows as thin callers of this repository's reusable workflows whenever those shared workflows cover the needed behavior.
-- For rollup upload callers, preserve automatic production uploads on pushes to `main` or `master`; manual dispatch should keep staged uploads as the default unless `production` is explicitly selected.
+- For rollup upload callers, pushes to `main` or `master` should publish only when AWS upload credentials or an OIDC
+  role are configured; otherwise they should fall back to a dry-run build. Manual dispatch should keep staged uploads
+  as the default unless `production` is explicitly selected.
 
 ## Workflow Validation And Security
 

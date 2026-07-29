@@ -178,7 +178,8 @@ Important inputs:
 - `s3-bucket`, `s3-prefix`, and `aws-region`
 - `aws-role-to-assume` for AWS OIDC authentication; using it requires `id-token: write`, and caller wrappers must not
   override the reusable workflow with stricter permissions
-- `production`, `dry-run`, `sync-dist-extras`, `cache-control`, and `metadata-refresh-files`
+- `production`, `dry-run`, `sync-dist-extras`, `cache-control`, and `metadata-refresh-files`; dry runs print the
+  planned S3 operations without configuring AWS credentials
 - `shared-automation-repository` and `shared-automation-ref` for the composite action checkout
 - `svelte-lib-repository` and `svelte-lib-ref` for the local `svelte-lib` dependency checkout
 - optional `local-dependency-repositories` entries as `owner/repo:path:ref`
