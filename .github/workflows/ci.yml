@@ -18,31 +18,26 @@ on:
         required: false
         type: string
         default: ""
-      install-command:
-        description: Dependency install command.
+      run-format:
+        description: Run npm run format:check.
         required: false
-        type: string
-        default: npm ci
-      format-command:
-        description: Formatting check command. Leave blank to skip.
+        type: boolean
+        default: true
+      run-lint:
+        description: Run npm run lint.
         required: false
-        type: string
-        default: npm run format:check
-      lint-command:
-        description: Lint command. Leave blank to skip.
+        type: boolean
+        default: true
+      run-check:
+        description: Run npm run check.
         required: false
-        type: string
-        default: npm run lint
-      check-command:
-        description: Type or framework check command. Leave blank to skip.
+        type: boolean
+        default: true
+      run-build:
+        description: Run npm run build.
         required: false
-        type: string
-        default: npm run check
-      build-command:
-        description: Build command. Leave blank to skip.
-        required: false
-        type: string
-        default: npm run build
+        type: boolean
+        default: true
       allowed-dispatch-actor:
         description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
         required: false
@@ -73,7 +68,7 @@ jobs:
           exit 1
 
       - name: Checkout caller repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           path: ${{ github.event.repository.name }}
           persist-credentials: false
@@ -105,7 +100,7 @@ jobs:
           done <<< "$LOCAL_DEPENDENCY_REPOSITORIES"
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ inputs.node-version }}
           cache: npm
@@ -144,24 +139,24 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
-        run: ${{ inputs.install-command }}
+        run: npm ci
 
       - name: Check formatting
-        if: inputs.format-command != ''
+        if: inputs.run-format
         working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
-        run: ${{ inputs.format-command }}
+        run: npm run format:check
 
       - name: Lint
-        if: inputs.lint-command != ''
+        if: inputs.run-lint
         working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
-        run: ${{ inputs.lint-command }}
+        run: npm run lint
 
       - name: Check package
-        if: inputs.check-command != ''
+        if: inputs.run-check
         working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
-        run: ${{ inputs.check-command }}
+        run: npm run check
 
       - name: Build
-        if: inputs.build-command != ''
+        if: inputs.run-build
         working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
-        run: ${{ inputs.build-command }}
+        run: npm run build

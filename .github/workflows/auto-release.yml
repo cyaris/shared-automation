@@ -43,6 +43,11 @@ on:
         required: false
         type: boolean
         default: true
+      review-artifact-retention-days:
+        description: Days to retain report-only review artifacts.
+        required: false
+        type: number
+        default: 30
       shared-automation-repository:
         description: Repository containing the shared release policy.
         required: false
@@ -50,16 +55,6 @@ on:
         default: ""
       shared-automation-ref:
         description: Ref used to read the shared release policy.
-        required: false
-        type: string
-        default: ""
-      svelte-lib-repository:
-        description: Deprecated compatibility alias for shared-automation-repository.
-        required: false
-        type: string
-        default: ""
-      svelte-lib-ref:
-        description: Deprecated compatibility alias for shared-automation-ref.
         required: false
         type: string
         default: ""
@@ -116,23 +111,24 @@ jobs:
           fi
 
       - name: Checkout caller repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           path: caller
+          persist-credentials: false
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - name: Checkout shared release policy
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          repository: ${{ inputs.shared-automation-repository || inputs.svelte-lib-repository || 'cyaris/shared-automation' }}
-          ref: ${{ inputs.shared-automation-ref || inputs.svelte-lib-ref || 'main' }}
+          repository: ${{ inputs.shared-automation-repository || 'cyaris/shared-automation' }}
+          ref: ${{ inputs.shared-automation-ref || 'main' }}
           path: shared-automation
           persist-credentials: false
           token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "24"
 
@@ -142,20 +138,27 @@ jobs:
         env:
           DEFAULT_BRANCH_INPUT: ${{ inputs.default-branch }}
           EVENT_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          FETCH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           POLICY_PATH: ${{ inputs.policy-path }}
           RELEASE_SHA_INPUT: ${{ inputs.release-sha }}
           UPDATE_EXISTING: ${{ inputs.update-existing }}
         run: |
           set -euo pipefail
 
+          git_fetch_origin() {
+            local auth_header
+            auth_header="$(printf 'x-access-token:%s' "$FETCH_TOKEN" | base64 | tr -d '\n')"
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" fetch "$@"
+          }
+
           default_branch="${DEFAULT_BRANCH_INPUT:-$EVENT_DEFAULT_BRANCH}"
-          if ! git fetch --force --tags origin; then
+          if ! git_fetch_origin --force --tags origin; then
             printf "Failed to fetch tags from %s.\n" "$GITHUB_REPOSITORY" >&2
             exit 1
           fi
 
           if [[ -n "$default_branch" ]]; then
-            if ! git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
+            if ! git_fetch_origin --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
               printf "Failed to fetch default branch %s from %s.\n" "$default_branch" "$GITHUB_REPOSITORY" >&2
               exit 1
             fi
@@ -171,7 +174,7 @@ jobs:
           fi
 
           if ! git cat-file -e "${release_sha}^{commit}" 2>/dev/null; then
-            if ! git fetch --force origin "$release_sha"; then
+            if ! git_fetch_origin --force origin "$release_sha"; then
               printf "Failed to fetch release_sha %s from %s.\n" "$release_sha" "$GITHUB_REPOSITORY" >&2
               exit 1
             fi
@@ -292,6 +295,7 @@ jobs:
           fs.writeFileSync("../release-context.json", JSON.stringify(context, null, 2))
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `commit_count=${allCommits.length}\n`)
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_count=${existingReleases.length}\n`)
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_sha=${context.releaseSha}\n`)
           NODE
 
       - name: Plan release reconciliation
@@ -504,6 +508,93 @@ jobs:
           })
           NODE
 
+      - name: Write review summary
+        if: always() && steps.plan.outcome == 'success'
+        working-directory: caller
+        env:
+          CREATE_COUNT: ${{ steps.plan.outputs.create_count }}
+          SUMMARY: ${{ steps.plan.outputs.summary }}
+          UPDATE_COUNT: ${{ steps.plan.outputs.update_count }}
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const fs = require("fs")
+          const context = JSON.parse(fs.readFileSync("../release-context.json", "utf8"))
+          const plan = JSON.parse(fs.readFileSync("../release-plan.json", "utf8"))
+          const escapeCell = (value) => String(value || "").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>")
+          const shortSha = (value) => String(value || "").slice(0, 12)
+          const counts = plan.actions.reduce((acc, action) => {
+            acc[action.action] = (acc[action.action] || 0) + 1
+            return acc
+          }, {})
+
+          const lines = [
+            `# Release Reconciliation Review: ${context.repository}`,
+            "",
+            `- Target commit: \`${context.releaseSha}\``,
+            `- Default branch: \`${context.defaultBranch || "unknown"}\``,
+            `- Existing releases: ${context.existingReleases.length}`,
+            `- Commits considered: ${context.commits.length} of ${context.commitCount}`,
+            `- Omitted commits: ${context.omittedCommitCount}`,
+            `- Changed files listed: ${context.changedFilesAtReleaseSha.length}`,
+            `- Omitted files: ${context.omittedFileCount}`,
+            `- Update existing releases: ${context.updateExisting}`,
+            "",
+            "## Plan Counts",
+            "",
+            `- Create: ${counts.create || 0}`,
+            `- Update: ${counts.update || 0}`,
+            `- Skip: ${counts.skip || 0}`,
+            "",
+            "## Summary",
+            "",
+            process.env.SUMMARY || plan.summary || "",
+            "",
+            "## Proposed Actions",
+            "",
+            "| Action | Tag | Target | Title | Reason |",
+            "| --- | --- | --- | --- | --- |"
+          ]
+
+          for (const action of plan.actions) {
+            lines.push(`| ${escapeCell(action.action)} | ${escapeCell(action.tag)} | \`${shortSha(action.target_sha)}\` | ${escapeCell(action.title)} | ${escapeCell(action.reason)} |`)
+          }
+
+          if (!plan.actions.length) {
+            lines.push("| skip |  |  | No actions proposed | No release actions were proposed |")
+          }
+
+          lines.push(
+            "",
+            "## Review Files",
+            "",
+            "- `release-plan.json` contains the normalized create/update/skip proposal.",
+            "- `release-context.json` contains the bounded repository context sent for planning.",
+            "- `existing-releases.raw.json`, `commits.tsv`, and `files.txt` contain source inventory data.",
+            "",
+            "Publication is controlled separately by `publish`; report-only runs do not create tags or releases."
+          )
+
+          fs.writeFileSync("../release-review-summary.md", `${lines.join("\n")}\n`)
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`)
+          NODE
+
+      - name: Upload review artifacts
+        if: always() && steps.plan.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-review-${{ github.event.repository.name }}-${{ steps.context.outputs.release_sha || github.sha }}
+          path: |
+            release-review-summary.md
+            release-plan.json
+            release-context.json
+            existing-releases.raw.json
+            commits.tsv
+            files.txt
+          if-no-files-found: error
+          retention-days: ${{ inputs.review-artifact-retention-days }}
+
       - name: Apply release reconciliation
         id: apply
         if: inputs.dry-run == false && inputs.publish == true
@@ -511,17 +602,24 @@ jobs:
         env:
           DEFAULT_BRANCH_INPUT: ${{ inputs.default-branch }}
           EVENT_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          FETCH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
         run: |
           set -euo pipefail
 
+          git_fetch_origin() {
+            local auth_header
+            auth_header="$(printf 'x-access-token:%s' "$FETCH_TOKEN" | base64 | tr -d '\n')"
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" fetch "$@"
+          }
+
           default_branch="${DEFAULT_BRANCH_INPUT:-$EVENT_DEFAULT_BRANCH}"
-          if ! git fetch --force --tags origin; then
+          if ! git_fetch_origin --force --tags origin; then
             printf "Failed to fetch tags from %s.\n" "$GITHUB_REPOSITORY" >&2
             exit 1
           fi
 
           if [[ -n "$default_branch" ]]; then
-            if ! git fetch --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
+            if ! git_fetch_origin --force origin "$default_branch:refs/remotes/origin/$default_branch"; then
               printf "Failed to fetch default branch %s from %s.\n" "$default_branch" "$GITHUB_REPOSITORY" >&2
               exit 1
             fi

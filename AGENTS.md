@@ -19,9 +19,13 @@
 ## Documentation
 
 - Document every workflow and composite action in `README.md` when adding, renaming, or changing it in a way that affects callers.
+- Keep README and AGENTS guidance focused on current behavior, active requirements, and durable project decisions. Remove
+  migration-era notes, deprecated-option explanations, old fallback paths, and historical caveats once they no longer
+  affect how someone uses, maintains, deploys, or releases the project. When a state change makes a requirement obsolete,
+  update the affected docs and configuration in that same change.
 - Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
 - Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
-- Keep private action and dependency access requirements documented in `README.md`. Caller repositories that check out private local dependencies need a checkout-capable `CHECKOUT_TOKEN` or `RELEASE_TOKEN`; callers that only read this public repository's reusable workflow files should not need a token for that read.
+- Keep private action and dependency access requirements documented in `README.md`.
 - Downstream README files should link to this repository's workflow descriptions instead of repeating shared behavior.
   Keep repo-specific details downstream, such as trigger branches, working directories, S3 prefixes, bundle file lists,
   dependency refs, skipped commands, and required repository variables or secrets.
@@ -32,6 +36,8 @@
   inputs, and secrets.
 - For CI caller README sections, describe local triggers, working directories, skipped commands, and dependency ref
   fallbacks, then link to the shared workflow description for validation behavior, inputs, and secrets.
+- Keep shared CI validation on fixed npm scripts controlled by boolean inputs. Add command-string escape hatches only
+  when a caller has a documented need that cannot be expressed through package scripts.
 - For rollup-upload caller README sections, describe the local upload trigger, S3 destination, bundle files, production
   or staged naming, and repository-specific dependency refs, then link to the shared workflow description for upload
   behavior, inputs, and secrets.
@@ -40,3 +46,11 @@
 
 - Caller repositories should keep root `CI`, `Rollup upload`, `Auto-create dev pull request`, and `Auto release` workflows as thin callers of this repository's reusable workflows whenever those shared workflows cover the needed behavior.
 - For rollup upload callers, preserve automatic production uploads on pushes to `main` or `master`; manual dispatch should keep staged uploads as the default unless `production` is explicitly selected.
+
+## Workflow Validation And Security
+
+- Keep `.github/workflows/workflow-validation.yml` aligned with workflow and composite-action changes so `actionlint` and
+  `zizmor` run when automation files change.
+- Treat `actionlint` failures as workflow contract or syntax issues to fix before rollout.
+- Treat `zizmor` findings as security-review prompts. Fix true positives, document accepted risks, and avoid broad
+  suppressions.

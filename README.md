@@ -5,8 +5,6 @@ Shared GitHub Actions workflows and automation used across cyaris repositories.
 This repository is the neutral home for reusable workflow implementations that should not live in an application or
 library repository. Downstream repositories should keep thin local wrapper workflows that define when the workflow runs,
 then call the reusable implementation here with `uses: cyaris/shared-automation/.github/workflows/<workflow>.yml@main`.
-This repository is public, so child repositories do not need a private checkout token just to read these reusable
-workflow files.
 
 Manual `workflow_dispatch` runs are guarded by the reusable workflow implementations. By default, they only allow the
 `cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
@@ -36,8 +34,6 @@ permissions:
 jobs:
   auto-create-dev-pr:
     uses: cyaris/shared-automation/.github/workflows/auto-create-dev-pr.yml@main
-    secrets:
-      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 ```
 
 The reusable job serializes runs with a repository/branch-specific concurrency group. This queues overlapping pushes
@@ -52,7 +48,7 @@ Important inputs:
 
 Optional secret:
 
-- `RELEASE_TOKEN` for repositories where `github.token` cannot create pull requests
+- `RELEASE_TOKEN` only when repository Actions settings cannot allow the run-scoped token to create pull requests
 
 ### `.github/workflows/auto-create-dev-pr-self.yml`
 
@@ -82,7 +78,7 @@ jobs:
       issues: write
       pull-requests: write
     with:
-      publish: true
+      publish: false
       update-existing: true
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -97,13 +93,12 @@ Important inputs:
 - `dry-run` for decision reporting without applying release changes, defaulting to `false`
 - `publish` for applying selected release creates and updates, defaulting to `false`
 - `update-existing` for allowing edits to existing release titles and notes, defaulting to `true`
+- `review-artifact-retention-days` for retaining report-only plan artifacts, defaulting to `30`
 - `shared-automation-repository` and `shared-automation-ref` for the shared release policy checkout
-- `svelte-lib-repository` and `svelte-lib-ref` as deprecated compatibility aliases for
-  `shared-automation-repository` and `shared-automation-ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
-The local `.github/workflows/auto-release-self.yml` wrapper overrides `publish` and `update-existing` to `true` so
-manual runs in this repository apply the selected reconciliation by default.
+The local `.github/workflows/auto-release-self.yml` wrapper uses the reusable defaults, so manual runs in this
+repository are report-only unless `publish` is explicitly enabled.
 
 Required secret:
 
@@ -111,14 +106,22 @@ Required secret:
 
 Optional secrets:
 
-- `RELEASE_TOKEN` for release and tag creation when broader permissions are needed
+- `RELEASE_TOKEN` for release and tag creation
 - `CHECKOUT_TOKEN` for reading private repositories used by the workflow
+
+Every successful planning run writes a Markdown review summary to the Actions run summary and uploads a review artifact
+named `release-review-<repo>-<sha>`. The artifact includes `release-review-summary.md`, `release-plan.json`,
+`release-context.json`, `existing-releases.raw.json`, `commits.tsv`, and `files.txt`. Multi-repository historical review
+runs should keep `publish: false`, download the review artifacts from each repository run, compare the proposed
+create/update/skip actions, then respond by updating release policy or rerunning with different inputs. GitHub Actions
+does not support editing propositions inside the running planning step; publication should be a later explicit run after
+the reviewed plan is approved.
 
 ### `.github/workflows/ci.yml`
 
 Reusable Node package validation workflow. It checks out the caller repository, optionally checks out and builds
-local `file:` dependency repositories, installs caller dependencies, then runs configurable format, lint, framework
-check, and build commands.
+local `file:` dependency repositories, runs `npm ci`, then runs the fixed `npm run format:check`, `npm run lint`,
+`npm run check`, and `npm run build` scripts unless the matching `run-*` flag disables that step.
 
 Typical caller wrapper:
 
@@ -143,8 +146,8 @@ jobs:
 
 Important inputs:
 
-- `working-directory`, `node-version`, and `install-command`
-- `format-command`, `lint-command`, `check-command`, and `build-command`; set any command to an empty string to skip it
+- `working-directory` and `node-version`
+- `run-format`, `run-lint`, `run-check`, and `run-build`; set a flag to `false` to skip that standard npm script
 - optional `local-dependency-repositories` entries as `owner/repo:path:ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
@@ -154,7 +157,12 @@ This keeps local `file:` dependencies usable even when generated `dist/` output 
 Optional secret:
 
 - `CHECKOUT_TOKEN` for reading private dependency repositories
-- `RELEASE_TOKEN` as a checkout fallback when `CHECKOUT_TOKEN` is not configured
+
+### `.github/workflows/workflow-validation.yml`
+
+Local workflow for this repository. It runs on changes to workflow, composite-action, release-policy, and automation
+documentation files, then validates GitHub Actions syntax with `actionlint` and audits workflow security with `zizmor`.
+The workflow can also be manually dispatched.
 
 ### `.github/workflows/rollup-upload.yml`
 
@@ -179,12 +187,10 @@ Important inputs:
 Optional secrets:
 
 - `CHECKOUT_TOKEN` for reading private dependency repositories
-- `RELEASE_TOKEN` as a checkout fallback when `CHECKOUT_TOKEN` is not configured
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` when `aws-role-to-assume` is omitted
 
-Private dependency note: callers that install private repositories such as `cyaris/svelte-lib` through local `file:`
-dependencies must pass a checkout-capable `CHECKOUT_TOKEN` or `RELEASE_TOKEN`. Callers that only read the reusable
-workflow files from this public repository do not need a token for that read.
+Private dependency note: callers that install private repositories through local `file:` dependencies need a
+checkout-capable token.
 
 ## Branch Model
 

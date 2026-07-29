@@ -131,13 +131,13 @@ jobs:
           exit 1
 
       - name: Checkout caller repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           path: ${{ github.event.repository.name }}
           persist-credentials: false
 
       - name: Checkout svelte-lib
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: ${{ inputs.svelte-lib-repository }}
           ref: ${{ inputs.svelte-lib-ref }}
@@ -146,7 +146,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout shared automation
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: ${{ inputs.shared-automation-repository }}
           ref: ${{ inputs.shared-automation-ref }}

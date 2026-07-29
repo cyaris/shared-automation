@@ -55,14 +55,16 @@ jobs:
           exit 1
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Create pull request if needed
         env:
           DEFAULT_BRANCH: ${{ inputs.default-branch || github.event.repository.default_branch }}
           DEV_BRANCH: ${{ inputs.dev-branch }}
+          FETCH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           PR_BODY: ${{ inputs.body }}
           PR_TITLE: ${{ inputs.title }}
@@ -70,12 +72,18 @@ jobs:
         run: |
           set -euo pipefail
 
+          git_fetch_origin() {
+            local auth_header
+            auth_header="$(printf 'x-access-token:%s' "$FETCH_TOKEN" | base64 | tr -d '\n')"
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" fetch "$@"
+          }
+
           if [[ "$DEFAULT_BRANCH" == "$DEV_BRANCH" ]]; then
             printf "The default branch is dev, so there is no separate base branch for a pull request.\n"
             exit 0
           fi
 
-          git fetch --no-tags origin \
+          git_fetch_origin --no-tags origin \
             "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" \
             "+refs/heads/${DEV_BRANCH}:refs/remotes/origin/${DEV_BRANCH}"
 
