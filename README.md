@@ -86,6 +86,8 @@ Important inputs:
 - `dry-run` for decision reporting without publishing
 - `publish` for explicit release publication after a release is selected
 - `shared-automation-repository` and `shared-automation-ref` for the shared release policy checkout
+- `svelte-lib-repository` and `svelte-lib-ref` as deprecated compatibility aliases for
+  `shared-automation-repository` and `shared-automation-ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
 Required secret:
@@ -151,7 +153,8 @@ Important inputs:
 - `working-directory` and `dist-directory`
 - `bundle-files` as `path:content-type` lines
 - `s3-bucket`, `s3-prefix`, and `aws-region`
-- `aws-role-to-assume` for AWS OIDC authentication
+- `aws-role-to-assume` for AWS OIDC authentication; using it requires `id-token: write`, and caller wrappers must not
+  override the reusable workflow with stricter permissions
 - `production`, `dry-run`, `sync-dist-extras`, `cache-control`, and `metadata-refresh-files`
 - `shared-automation-repository` and `shared-automation-ref` for the composite action checkout
 - `svelte-lib-repository` and `svelte-lib-ref` for the local `svelte-lib` dependency checkout
