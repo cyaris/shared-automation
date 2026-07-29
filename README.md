@@ -51,6 +51,11 @@ Optional secret:
 
 - `RELEASE_TOKEN` for repositories where `github.token` cannot create pull requests
 
+### `.github/workflows/auto-create-dev-pr-self.yml`
+
+Local workflow for this repository. It runs on pushes to `dev`, then delegates pull request creation to
+`.github/workflows/auto-create-dev-pr.yml`.
+
 ### `.github/workflows/auto-release-self.yml`
 
 Local workflow for this repository. It runs after merged pull requests and from manual dispatch, then delegates release
