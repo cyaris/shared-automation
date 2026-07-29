@@ -27,10 +27,6 @@ on:
     branches:
       - dev
 
-concurrency:
-  group: auto-create-dev-pr-${{ github.repository }}-dev
-  cancel-in-progress: false
-
 permissions:
   contents: read
   pull-requests: write
@@ -41,8 +37,7 @@ jobs:
 ```
 
 The reusable job serializes runs with a repository/branch-specific concurrency group. This queues overlapping pushes
-before the pull request existence check and creation step run. Caller workflows may also declare their own concurrency
-group for the triggering branch when they want the entire wrapper run serialized.
+before the pull request existence check and creation step run.
 
 Important inputs:
 
@@ -53,12 +48,12 @@ Important inputs:
 
 Optional secret:
 
-- `RELEASE_TOKEN` for repositories where `github.token` cannot create pull requests
+- `RELEASE_TOKEN` only when repository Actions settings cannot allow the run-scoped token to create pull requests
 
 ### `.github/workflows/auto-create-dev-pr-self.yml`
 
 Local workflow for this repository. It runs on pushes to `dev`, then delegates pull request creation to
-`.github/workflows/auto-create-dev-pr.yml`. It queues overlapping `dev` pushes at the workflow level.
+`.github/workflows/auto-create-dev-pr.yml`.
 
 ### `.github/workflows/auto-release-self.yml`
 
