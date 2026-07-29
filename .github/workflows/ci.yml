@@ -97,8 +97,17 @@ jobs:
             fi
 
             auth_header="$(printf 'x-access-token:%s' "$FETCH_TOKEN" | base64 | tr -d '\n')"
-            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
-              clone --branch "$ref" --depth 1 "https://github.com/${repository}.git" "$path"
+
+            if [[ "$ref" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
+                clone --no-checkout --depth 1 "https://github.com/${repository}.git" "$path"
+              git -C "$path" -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
+                fetch --depth 1 origin "$ref"
+              git -C "$path" checkout --detach FETCH_HEAD
+            else
+              git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
+                clone --branch "$ref" --depth 1 "https://github.com/${repository}.git" "$path"
+            fi
           done <<< "$LOCAL_DEPENDENCY_REPOSITORIES"
 
       - name: Set up Node.js
