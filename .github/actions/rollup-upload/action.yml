@@ -165,15 +165,29 @@ runs:
       shell: bash
       run: npm run rollup
 
+    - name: Validate AWS credential inputs
+      env:
+        AWS_ACCESS_KEY_ID_INPUT: ${{ inputs.aws-access-key-id }}
+        AWS_ROLE_TO_ASSUME: ${{ inputs.aws-role-to-assume }}
+        AWS_SECRET_ACCESS_KEY_INPUT: ${{ inputs.aws-secret-access-key }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if [[ -z "$AWS_ROLE_TO_ASSUME" && ( -z "$AWS_ACCESS_KEY_ID_INPUT" || -z "$AWS_SECRET_ACCESS_KEY_INPUT" ) ]]; then
+          printf "Rollup uploads require aws-role-to-assume or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.\n" >&2
+          exit 1
+        fi
+
     - name: Configure AWS credentials with OIDC role
-      if: inputs.dry-run != 'true' && inputs.aws-role-to-assume != ''
+      if: inputs.aws-role-to-assume != ''
       uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
       with:
         aws-region: ${{ inputs.aws-region }}
         role-to-assume: ${{ inputs.aws-role-to-assume }}
 
     - name: Configure AWS credentials with access keys
-      if: inputs.dry-run != 'true' && inputs.aws-role-to-assume == ''
+      if: inputs.aws-role-to-assume == ''
       uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
       with:
         aws-region: ${{ inputs.aws-region }}
@@ -204,6 +218,10 @@ runs:
           bundle_prefix=""
         fi
 
+        if [[ "$DRY_RUN" == "true" ]]; then
+          aws_args+=(--dryrun)
+        fi
+
         if [[ ! -d "$DIST_DIRECTORY" ]]; then
           printf "Missing dist directory: %s\n" "$DIST_DIRECTORY" >&2
           exit 1
@@ -221,18 +239,10 @@ runs:
         done <<< "$BUNDLE_FILES"
 
         if [[ "$SYNC_DIST_EXTRAS" == "true" ]]; then
-          if [[ "$DRY_RUN" == "true" ]]; then
-            printf "Would sync %s/ to s3://%s/%s/ with cache-control %s\n" \
-              "$DIST_DIRECTORY" \
-              "$S3_BUCKET" \
-              "${S3_PREFIX%/}" \
-              "$CACHE_CONTROL"
-          else
-            aws s3 sync "$DIST_DIRECTORY/" "s3://${S3_BUCKET}/${S3_PREFIX%/}/" \
-              "${aws_args[@]}" \
-              "${sync_exclude_args[@]}" \
-              --cache-control "$CACHE_CONTROL"
-          fi
+          aws s3 sync "$DIST_DIRECTORY/" "s3://${S3_BUCKET}/${S3_PREFIX%/}/" \
+            "${aws_args[@]}" \
+            "${sync_exclude_args[@]}" \
+            --cache-control "$CACHE_CONTROL"
         fi
 
         while IFS= read -r spec; do
@@ -257,19 +267,10 @@ runs:
             exit 1
           fi
 
-          if [[ "$DRY_RUN" == "true" ]]; then
-            printf "Would upload %s to s3://%s/%s as %s with cache-control %s\n" \
-              "$source_file" \
-              "$S3_BUCKET" \
-              "$s3_key" \
-              "$content_type" \
-              "$CACHE_CONTROL"
-          else
-            aws s3 cp "$source_file" "s3://${S3_BUCKET}/${s3_key}" \
-              "${aws_args[@]}" \
-              --content-type "$content_type" \
-              --cache-control "$CACHE_CONTROL"
-          fi
+          aws s3 cp "$source_file" "s3://${S3_BUCKET}/${s3_key}" \
+            "${aws_args[@]}" \
+            --content-type "$content_type" \
+            --cache-control "$CACHE_CONTROL"
         done <<< "$BUNDLE_FILES"
 
         while IFS= read -r spec; do
@@ -280,17 +281,9 @@ runs:
           s3_key="${spec%%:*}"
           content_type="${spec#*:}"
 
-          if [[ "$DRY_RUN" == "true" ]]; then
-            printf "Would refresh metadata for s3://%s/%s as %s with cache-control %s\n" \
-              "$S3_BUCKET" \
-              "$s3_key" \
-              "$content_type" \
-              "$CACHE_CONTROL"
-          else
-            aws s3 cp "s3://${S3_BUCKET}/${s3_key}" "s3://${S3_BUCKET}/${s3_key}" \
-              "${aws_args[@]}" \
-              --metadata-directive REPLACE \
-              --content-type "$content_type" \
-              --cache-control "$CACHE_CONTROL"
-          fi
+          aws s3 cp "s3://${S3_BUCKET}/${s3_key}" "s3://${S3_BUCKET}/${s3_key}" \
+            "${aws_args[@]}" \
+            --metadata-directive REPLACE \
+            --content-type "$content_type" \
+            --cache-control "$CACHE_CONTROL"
         done <<< "$METADATA_REFRESH_FILES"
