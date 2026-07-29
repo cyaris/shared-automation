@@ -65,8 +65,8 @@ on:
         default: cyaris
     secrets:
       OPENAI_API_KEY:
-        description: OpenAI API key used for automated release decisions.
-        required: true
+        description: Optional OpenAI API key used for automated release decisions.
+        required: false
       RELEASE_TOKEN:
         description: Optional token with permission to create releases and tags.
         required: false
@@ -99,27 +99,47 @@ jobs:
           printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
           exit 1
 
+      - name: Check release decision credentials
+        id: release-credentials
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "$OPENAI_API_KEY" ]]; then
+            printf "available=true\n" >> "$GITHUB_OUTPUT"
+          else
+            printf "available=false\n" >> "$GITHUB_OUTPUT"
+            printf "OPENAI_API_KEY is not configured; skipping release decision.\n"
+          fi
+
       - name: Checkout caller repository
+        if: steps.release-credentials.outputs.available == 'true'
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
           path: caller
+          persist-credentials: false
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - name: Checkout shared release policy
+        if: steps.release-credentials.outputs.available == 'true'
         uses: actions/checkout@v6
         with:
           repository: ${{ inputs.shared-automation-repository || inputs.svelte-lib-repository || 'cyaris/shared-automation' }}
           ref: ${{ inputs.shared-automation-ref || inputs.svelte-lib-ref || 'main' }}
           path: shared-automation
+          persist-credentials: false
           token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
 
       - name: Set up Node.js
+        if: steps.release-credentials.outputs.available == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: "24"
 
       - name: Gather release context
+        if: steps.release-credentials.outputs.available == 'true'
         id: context
         working-directory: caller
         env:
@@ -200,6 +220,7 @@ jobs:
           NODE
 
       - name: Decide release
+        if: steps.release-credentials.outputs.available == 'true'
         id: decide
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -210,97 +231,102 @@ jobs:
           node <<'NODE'
           const fs = require("fs")
 
-          const context = JSON.parse(fs.readFileSync("release-context.json", "utf8"))
-          const schema = {
-            type: "object",
-            additionalProperties: false,
-            required: ["create_release", "tag", "title", "notes", "reason"],
-            properties: {
-              create_release: { type: "boolean" },
-              tag: { type: "string" },
-              title: { type: "string" },
-              notes: { type: "string" },
-              reason: { type: "string" }
-            }
-          }
-
-          const system = [
-            "You decide whether a merged pull request marks a release milestone.",
-            "Use the base release policy, then apply any local policy overrides.",
-            "Create releases only for meaningful milestones, not routine maintenance.",
-            "Pick the next tag using the repository's existing release history and policy.",
-            "The tag must be a new tag, must not contain spaces or slashes, and should normally start with v.",
-            "Write concise GitHub release notes for users and future maintainers.",
-            "Return only JSON that matches the provided schema."
-          ].join(" ")
-
-          const body = {
-            model: process.env.OPENAI_MODEL,
-            input: [
-              { role: "system", content: system },
-              { role: "user", content: JSON.stringify(context, null, 2) }
-            ],
-            text: {
-              format: {
-                type: "json_schema",
-                name: "release_decision",
-                strict: true,
-                schema
+          ;(async () => {
+            const context = JSON.parse(fs.readFileSync("release-context.json", "utf8"))
+            const schema = {
+              type: "object",
+              additionalProperties: false,
+              required: ["create_release", "tag", "title", "notes", "reason"],
+              properties: {
+                create_release: { type: "boolean" },
+                tag: { type: "string" },
+                title: { type: "string" },
+                notes: { type: "string" },
+                reason: { type: "string" }
               }
             }
-          }
 
-          const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 120000)
-          let response
-          try {
-            response = await fetch("https://api.openai.com/v1/responses", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify(body),
-              signal: controller.signal
-            })
-          } finally {
-            clearTimeout(timeout)
-          }
+            const system = [
+              "You decide whether a merged pull request marks a release milestone.",
+              "Use the base release policy, then apply any local policy overrides.",
+              "Create releases only for meaningful milestones, not routine maintenance.",
+              "Pick the next tag using the repository's existing release history and policy.",
+              "The tag must be a new tag, must not contain spaces or slashes, and should normally start with v.",
+              "Write concise GitHub release notes for users and future maintainers.",
+              "Return only JSON that matches the provided schema."
+            ].join(" ")
 
-          const data = await response.json()
-          if (!response.ok) {
-            throw new Error(`OpenAI API request failed: ${response.status} ${JSON.stringify(data)}`)
-          }
+            const body = {
+              model: process.env.OPENAI_MODEL,
+              input: [
+                { role: "system", content: system },
+                { role: "user", content: JSON.stringify(context, null, 2) }
+              ],
+              text: {
+                format: {
+                  type: "json_schema",
+                  name: "release_decision",
+                  strict: true,
+                  schema
+                }
+              }
+            }
 
-          const outputText = data.output_text || (data.output || [])
-            .flatMap((item) => item.content || [])
-            .find((content) => content.type === "output_text")?.text
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 120000)
+            let response
+            try {
+              response = await fetch("https://api.openai.com/v1/responses", {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify(body),
+                signal: controller.signal
+              })
+            } finally {
+              clearTimeout(timeout)
+            }
 
-          if (!outputText) {
-            throw new Error(`OpenAI response did not include output text: ${JSON.stringify(data)}`)
-          }
+            const data = await response.json()
+            if (!response.ok) {
+              throw new Error(`OpenAI API request failed: ${response.status} ${JSON.stringify(data)}`)
+            }
 
-          const decision = JSON.parse(outputText)
-          decision.create_release = Boolean(decision.create_release)
-          decision.tag = String(decision.tag || "").trim()
-          decision.title = String(decision.title || "").replace(/\s+/g, " ").trim()
-          decision.notes = String(decision.notes || "").trim()
-          decision.reason = String(decision.reason || "").replace(/\s+/g, " ").trim()
+            const outputText = data.output_text || (data.output || [])
+              .flatMap((item) => item.content || [])
+              .find((content) => content.type === "output_text")?.text
 
-          const tagPattern = /^v[0-9]+(\.[0-9]+){0,2}([._-][A-Za-z0-9]+)?$/
-          if (!decision.create_release) {
-            decision.tag = ""
-          } else if (!tagPattern.test(decision.tag) || decision.tag.includes("..")) {
-            throw new Error(`Invalid release tag: ${decision.tag}`)
-          }
+            if (!outputText) {
+              throw new Error(`OpenAI response did not include output text: ${JSON.stringify(data)}`)
+            }
 
-          fs.writeFileSync("release-decision.json", JSON.stringify(decision, null, 2))
-          fs.writeFileSync("release-notes.md", decision.notes + "\n")
+            const decision = JSON.parse(outputText)
+            decision.create_release = Boolean(decision.create_release)
+            decision.tag = String(decision.tag || "").trim()
+            decision.title = String(decision.title || "").replace(/\s+/g, " ").trim()
+            decision.notes = String(decision.notes || "").trim()
+            decision.reason = String(decision.reason || "").replace(/\s+/g, " ").trim()
 
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `create_release=${decision.create_release}\n`)
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag=${decision.tag}\n`)
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `title=${decision.title}\n`)
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason<<REASON\n${decision.reason}\nREASON\n`)
+            const tagPattern = /^v[0-9]+(\.[0-9]+){0,2}([._-][A-Za-z0-9]+)?$/
+            if (!decision.create_release) {
+              decision.tag = ""
+            } else if (!tagPattern.test(decision.tag) || decision.tag.includes("..")) {
+              throw new Error(`Invalid release tag: ${decision.tag}`)
+            }
+
+            fs.writeFileSync("release-decision.json", JSON.stringify(decision, null, 2))
+            fs.writeFileSync("release-notes.md", decision.notes + "\n")
+
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `create_release=${decision.create_release}\n`)
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag<<TAG\n${decision.tag}\nTAG\n`)
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `title<<TITLE\n${decision.title}\nTITLE\n`)
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason<<REASON\n${decision.reason}\nREASON\n`)
+          })().catch((error) => {
+            console.error(error)
+            process.exit(1)
+          })
           NODE
 
       - name: Publish release
@@ -353,7 +379,7 @@ jobs:
           fi
 
       - name: Report no release
-        if: steps.decide.outputs.create_release != 'true'
+        if: steps.release-credentials.outputs.available == 'true' && steps.decide.outputs.create_release != 'true'
         working-directory: caller
         env:
           PR_NUMBER: ${{ inputs.pr-number }}
@@ -375,3 +401,8 @@ jobs:
         run: |
           set -euo pipefail
           printf "Release selected but not published %s: %s\n" "$TAG" "$TITLE"
+
+      - name: Report skipped release decision
+        if: steps.release-credentials.outputs.available != 'true'
+        run: |
+          printf "Auto release skipped because OPENAI_API_KEY is not configured.\n"

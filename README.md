@@ -90,12 +90,9 @@ Important inputs:
   `shared-automation-repository` and `shared-automation-ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
-Required secret:
-
-- `OPENAI_API_KEY`
-
 Optional secrets:
 
+- `OPENAI_API_KEY` for release decisions; when omitted, the workflow skips release decision work without failing
 - `RELEASE_TOKEN` for release and tag creation when broader permissions are needed
 - `CHECKOUT_TOKEN` for reading private repositories used by the workflow
 
