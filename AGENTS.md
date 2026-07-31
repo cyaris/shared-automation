@@ -55,11 +55,28 @@
   permissions, or paid services that are not configured. Apply this to dry-run modes too: a dry run may avoid external
   writes, but it should still prove that required credentials exist unless the feature is explicitly documented as
   credential-optional.
+- Prefer AWS OIDC for deployment workflows. Caller jobs that pass `aws-role-to-assume` must grant `id-token: write`;
+  static AWS access-key secrets may remain only as a compatibility fallback until callers have repository-specific OIDC
+  roles configured.
 - Use accurate Conventional Commit subjects for changes that Release Please should classify. Do not inflate routine work
   into release-triggering types: use types such as `chore:`, `ci:`, `docs:`, `test:`, or `refactor:` for maintenance,
   and reserve `feat:`, `fix:`, `perf:`, and breaking-change syntax for changes that genuinely match those meanings.
 - For rollup upload callers, pushes to `main` or `master` should run production uploads. Manual dispatch should keep
   staged uploads as the default unless `production` is explicitly selected.
+
+## Dependency Automation
+
+- Keep shared Renovate defaults in `default.json`. Participating repositories should keep local `renovate.json` files as
+  thin wrappers that extend `github>cyaris/shared-automation`, then add repository-specific overrides only when the
+  shared preset cannot describe a durable local need.
+- Configure Renovate to manage npm dependencies, GitHub Actions, reusable workflow references, lockfile maintenance,
+  Node versions declared in workflow inputs, and any future Docker files that Renovate can detect natively.
+- Do not enable Renovate automerge by default. Dependency updates should remain reviewable pull requests unless a
+  repository has an explicit low-risk automerge policy.
+- Keep generated, vendored, and build-output paths out of Renovate scans, including `node_modules`, `_site`,
+  `.svelte-kit`, `dist`, and `build`.
+- Document Renovate GitHub App installation and access requirements before claiming dependency automation is active for
+  a repository.
 
 ## Workflow Validation And Security
 

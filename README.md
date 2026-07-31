@@ -180,6 +180,28 @@ Local workflow for this repository. It runs on changes to workflow, composite-ac
 documentation files, then validates GitHub Actions syntax with `actionlint`, validates JSON automation config, and
 audits workflow security with `zizmor`. The workflow can also be manually dispatched.
 
+## Renovate
+
+Renovate dependency automation is prepared through the shared preset in `default.json`. Participating repositories keep
+small local `renovate.json` files that extend `github>cyaris/shared-automation`, so common grouping, scheduling, labels,
+and ignored generated paths stay centralized while repository-local overrides remain possible.
+
+The shared preset covers:
+
+- npm dependency and lockfile updates
+- GitHub Actions and reusable workflow references
+- lockfile maintenance before 6am on Mondays in `America/Chicago`
+- grouped minor and patch npm updates for production and development dependencies
+- grouped GitHub Actions updates, including `cyaris/shared-automation` workflow references
+- generated and vendored path exclusions for `node_modules`, `_site`, `.svelte-kit`, `dist`, and `build`
+
+Renovate automerge is not enabled. Dependency updates should arrive as reviewable pull requests unless a repository
+adds an explicit local automerge policy later.
+
+Remote setup is still required before Renovate runs. Install the Renovate GitHub App for each participating repository,
+and grant the app access to `cyaris/shared-automation` so it can resolve the shared preset. For private repositories,
+the app must be allowed to read both the target repository and this preset repository.
+
 ### `.github/workflows/rollup-upload.yml`
 
 Reusable embedded bundle workflow. It checks out the caller repository, checks out `svelte-lib` as a local dependency,
@@ -194,13 +216,19 @@ Important inputs:
 - `working-directory` and `dist-directory`
 - `bundle-files` as `path:content-type` lines
 - `s3-bucket`, `s3-prefix`, and `aws-region`
-- `aws-role-to-assume` for AWS OIDC authentication; using it requires `id-token: write`, and caller wrappers must not
-  override the reusable workflow with stricter permissions
+- `aws-role-to-assume` for AWS OIDC authentication; using it requires `id-token: write`, and caller wrappers must grant
+  that permission on the job that calls this reusable workflow
 - `production`, `dry-run`, `sync-dist-extras`, `cache-control`, and `metadata-refresh-files`
 - `shared-automation-repository` and `shared-automation-ref` for the composite action checkout
 - `svelte-lib-repository` and `svelte-lib-ref` for the local `svelte-lib` dependency checkout
 - optional `local-dependency-repositories` entries as `owner/repo:path:ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
+
+AWS OIDC is the preferred authentication path. Rollup caller repositories should store the role ARN in a repository
+variable such as `AWS_ROLLUP_UPLOAD_ROLE_ARN`, pass it to `aws-role-to-assume`, and grant only `contents: read` and
+`id-token: write` on the upload job. If `aws-role-to-assume` is blank, the workflow falls back to static AWS access-key
+secrets. Dry runs validate that one of those credential paths exists, because a dry run should prove the configured
+deployment credentials are available even though it does not write S3 objects.
 
 Optional secrets:
 
