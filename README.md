@@ -176,9 +176,57 @@ Optional secret:
 
 ### `.github/workflows/workflow-validation.yml`
 
-Local workflow for this repository. It runs on changes to workflow, composite-action, release-policy, and automation
-documentation files, then validates GitHub Actions syntax with `actionlint`, validates JSON automation config, and
-audits workflow security with `zizmor`. The workflow can also be manually dispatched.
+Reusable workflow validation for GitHub Actions and automation configuration. It runs on changes to workflow,
+composite-action, release-policy, release config, Renovate config, and automation documentation files in this repository.
+Dependent repositories with meaningful local workflow logic can call it from a thin local wrapper.
+
+Typical caller wrapper:
+
+```yaml
+name: Workflow validation
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - ".github/release-policy.yml"
+      - ".github/workflows/**"
+      - ".release-please-manifest.json"
+      - "release-please-config.json"
+      - "renovate.json"
+  pull_request:
+    paths:
+      - ".github/release-policy.yml"
+      - ".github/workflows/**"
+      - ".release-please-manifest.json"
+      - "release-please-config.json"
+      - "renovate.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-validation:
+    uses: cyaris/shared-automation/.github/workflows/workflow-validation.yml@main
+```
+
+Validation includes:
+
+- GitHub Actions syntax and expression checks with `actionlint`
+- JSON parsing for configured release and Renovate files
+- GitHub Actions security analysis with `zizmor`
+
+Important inputs:
+
+- `json-files`, defaulting to `.release-please-manifest.json`, `release-please-config.json`, and `renovate.json`
+- `allowed-dispatch-actor`, defaulting to `cyaris`
+
+Pure thin-caller repositories do not need a local wrapper by default. Add one when a repository owns local shell logic,
+deployment permissions, Pages deployment steps, rollup resolver behavior, or other workflow behavior that should be
+validated before merge.
 
 ## Renovate
 

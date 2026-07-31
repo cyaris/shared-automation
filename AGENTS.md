@@ -47,6 +47,8 @@
 - For rollup-upload caller README sections, describe the local upload trigger, S3 destination, bundle files, production
   or staged naming, and repository-specific dependency refs, then link to the shared workflow description for upload
   behavior, inputs, and secrets.
+- For workflow-validation caller README sections, describe that the local wrapper validates repository-owned workflow
+  logic, then link to the shared workflow description for actionlint, JSON config, and zizmor behavior.
 
 ## Caller Workflow Expectations
 
@@ -82,6 +84,9 @@
 
 - Keep `.github/workflows/workflow-validation.yml` aligned with workflow and composite-action changes so `actionlint` and
   `zizmor` run when automation files change.
+- Add workflow-validation callers to dependent repositories when they own meaningful local workflow logic, such as
+  deployment jobs, rollup input-resolution shell, local permissions decisions, or nontrivial Pages workflows. Avoid
+  adding validation wrappers solely for repositories that contain only thin calls to shared workflows.
 - Before merging any pull request, explicitly inspect CodeRabbit comments and reviews and assess every still-applicable
   finding; do not merge solely because checks are green.
 - Treat `actionlint` failures as workflow contract or syntax issues to fix before rollout.
