@@ -1,6 +1,21 @@
 name: Workflow validation
 
 on:
+  workflow_call:
+    inputs:
+      json-files:
+        description: Newline-separated JSON configuration files to validate.
+        required: false
+        type: string
+        default: |
+          .release-please-manifest.json
+          release-please-config.json
+          renovate.json
+      allowed-dispatch-actor:
+        description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
+        required: false
+        type: string
+        default: cyaris
   push:
     branches:
       - dev
@@ -33,10 +48,14 @@ jobs:
 
     steps:
       - name: Validate manual dispatcher
-        if: ${{ github.event_name == 'workflow_dispatch' && github.actor != 'cyaris' }}
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          ALLOWED_DISPATCH_ACTOR: ${{ inputs['allowed-dispatch-actor'] || 'cyaris' }}
         run: |
-          printf "Manual dispatch is restricted to cyaris.\n" >&2
-          exit 1
+          if [[ "$GITHUB_ACTOR" != "$ALLOWED_DISPATCH_ACTOR" ]]; then
+            printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
+            exit 1
+          fi
 
   actionlint:
     needs: validate-manual-dispatch
@@ -71,8 +90,30 @@ jobs:
           persist-credentials: false
 
       - name: Validate JSON configuration
+        env:
+          JSON_FILES: ${{ inputs['json-files'] }}
         run: |
-          node -e "for (const file of ['.release-please-manifest.json', 'release-please-config.json']) JSON.parse(require('fs').readFileSync(file, 'utf8'))"
+          set -euo pipefail
+
+          if [[ -z "${JSON_FILES:-}" ]]; then
+            JSON_FILES=$'.release-please-manifest.json\nrelease-please-config.json\nrenovate.json'
+          fi
+
+          while IFS= read -r file; do
+            file="${file#"${file%%[![:space:]]*}"}"
+            file="${file%"${file##*[![:space:]]}"}"
+
+            if [[ -z "$file" ]]; then
+              continue
+            fi
+
+            if [[ ! -f "$file" ]]; then
+              printf "Configured JSON file does not exist: %s\n" "$file" >&2
+              exit 1
+            fi
+
+            node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$file"
+          done <<< "$JSON_FILES"
 
   zizmor:
     needs: validate-manual-dispatch
