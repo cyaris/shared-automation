@@ -60,6 +60,14 @@ Local workflow for this repository. It runs on pushes to `dev`, then delegates p
 Local workflow for this repository. It runs from manual dispatch only, then delegates release reconciliation to
 `.github/workflows/auto-release.yml`.
 
+### `.github/workflows/release-please.yml`
+
+Local workflow for future releases in this repository. It runs on pushes to `main` and manual dispatches by `cyaris`,
+then uses Release Please with `release-please-config.json` and `.release-please-manifest.json`.
+
+The config starts after the historical `v1.1.0` release SHA, so Release Please does not republish already reconciled
+history. Release Please opens release pull requests and publishes releases after those pull requests are merged.
+
 ### `.github/workflows/auto-release.yml`
 
 Reusable release-reconciliation workflow for `workflow_call` consumers. It gathers the caller repository's commit
@@ -161,8 +169,8 @@ Optional secret:
 ### `.github/workflows/workflow-validation.yml`
 
 Local workflow for this repository. It runs on changes to workflow, composite-action, release-policy, and automation
-documentation files, then validates GitHub Actions syntax with `actionlint` and audits workflow security with `zizmor`.
-The workflow can also be manually dispatched.
+documentation files, then validates GitHub Actions syntax with `actionlint`, validates JSON automation config, and
+audits workflow security with `zizmor`. The workflow can also be manually dispatched.
 
 ### `.github/workflows/rollup-upload.yml`
 
