@@ -54,9 +54,9 @@ inputs:
   sync-dist-extras:
     description: Sync non-bundle files from dist-directory to the S3 prefix.
     required: false
-    default: "true"
+    default: "false"
   cache-control:
-    description: Cache-Control metadata for uploaded bundle and extra files.
+    description: Cache-Control metadata for uploaded bundle and optional extra files.
     required: false
     default: no-cache, max-age=0, must-revalidate
   metadata-refresh-files:

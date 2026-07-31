@@ -168,6 +168,8 @@ The workflow can also be manually dispatched.
 
 Reusable embedded bundle workflow. It checks out the caller repository, checks out `svelte-lib` as a local dependency,
 checks out this repository for the composite upload action, then builds and uploads configured bundle files to S3.
+It uploads only `bundle-files` by default; callers that need additional generated assets can opt into
+`sync-dist-extras`.
 
 The composite action implementation lives at `.github/actions/rollup-upload/action.yml`.
 
