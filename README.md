@@ -68,6 +68,10 @@ then uses Release Please with `release-please-config.json` and `.release-please-
 The config starts after the historical `v1.1.0` release SHA, so Release Please does not republish already reconciled
 history. Release Please opens release pull requests and publishes releases after those pull requests are merged.
 
+Dependent repositories use small repository-local Release Please workflows with the official action directly rather than
+a reusable shared wrapper. Their local `release-please-config.json` files own the historical handoff SHA and manifest
+version, which keeps future release ownership close to each repository and avoids another indirection layer.
+
 ### `.github/workflows/auto-release.yml`
 
 Reusable release-reconciliation workflow for `workflow_call` consumers. It gathers the caller repository's commit
