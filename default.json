@@ -1,0 +1,52 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":semanticCommitTypeAll(chore)",
+    ":semanticCommitScopeAll(deps)"
+  ],
+  "timezone": "America/Chicago",
+  "schedule": ["before 6am on monday"],
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 5,
+  "minimumReleaseAge": "3 days",
+  "labels": ["dependencies"],
+  "ignorePaths": ["**/node_modules/**", "**/_site/**", "**/.svelte-kit/**", "**/dist/**", "**/build/**"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions",
+      "labels": ["dependencies", "github-actions"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["cyaris/shared-automation"],
+      "groupName": "shared automation workflow references",
+      "groupSlug": "shared-automation-workflows",
+      "labels": ["dependencies", "github-actions", "shared-automation"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm production dependency minor and patch updates",
+      "groupSlug": "npm-prod-minor-patch",
+      "labels": ["dependencies", "npm"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm development dependency minor and patch updates",
+      "groupSlug": "npm-dev-minor-patch",
+      "labels": ["dependencies", "npm"]
+    }
+  ]
+}
