@@ -40,8 +40,10 @@
   inputs, and secrets.
 - For CI caller README sections, describe local triggers, working directories, skipped commands, and dependency ref
   fallbacks, then link to the shared workflow description for validation behavior, inputs, and secrets.
-- Keep shared CI validation on fixed npm scripts controlled by boolean inputs. Add command-string escape hatches only
-  when a caller has a documented need that cannot be expressed through package scripts.
+- Keep reusable workflow and composite-action contracts on structured inputs such as booleans, paths, refs, file lists,
+  and validated spec lines. Do not expose arbitrary shell command strings as caller inputs unless a documented caller
+  need cannot be expressed through fixed package scripts or structured configuration; keep shared CI validation on fixed
+  npm scripts controlled by boolean inputs.
 - For rollup-upload caller README sections, describe the local upload trigger, S3 destination, bundle files, production
   or staged naming, and repository-specific dependency refs, then link to the shared workflow description for upload
   behavior, inputs, and secrets.

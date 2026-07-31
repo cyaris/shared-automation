@@ -10,6 +10,10 @@ Manual `workflow_dispatch` runs are guarded by the reusable workflow implementat
 `cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
 release, upload, or deployment work happens.
 
+Reusable workflow and composite-action contracts use structured inputs such as booleans, paths, refs, file lists, and
+validated spec lines. They avoid caller-provided shell command strings unless a documented repository need cannot be
+expressed through fixed package scripts or structured configuration.
+
 ## Workflows
 
 ### `.github/workflows/auto-create-dev-pr.yml`
