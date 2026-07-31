@@ -12,11 +12,6 @@ release, upload, or deployment work happens.
 
 ## Workflows
 
-Historical release publication completed through the handoff boundaries in
-[`docs/historical-release-handoff.md`](docs/historical-release-handoff.md). Future Release Please setup should follow
-[`docs/release-please-preparation.md`](docs/release-please-preparation.md) so it does not overlap the historical
-reconciliation range.
-
 ### `.github/workflows/auto-create-dev-pr.yml`
 
 Reusable workflow for opening a pull request from `dev` to the caller repository default branch after changes are pushed
