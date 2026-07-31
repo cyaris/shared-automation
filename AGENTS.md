@@ -56,6 +56,8 @@
 
 - Keep `.github/workflows/workflow-validation.yml` aligned with workflow and composite-action changes so `actionlint` and
   `zizmor` run when automation files change.
+- Before merging any pull request, explicitly inspect CodeRabbit comments and reviews and assess every still-applicable
+  finding; do not merge solely because checks are green.
 - Treat `actionlint` failures as workflow contract or syntax issues to fix before rollout.
 - Treat `zizmor` findings as security-review prompts. Fix true positives, document accepted risks, and avoid broad
   suppressions.
