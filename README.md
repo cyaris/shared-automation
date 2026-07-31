@@ -205,4 +205,14 @@ checkout-capable token.
 ## Branch Model
 
 Use `main` for stable reusable workflow definitions and `dev` for proposed changes. Dependent repositories should call
-`@main` by default and use a pinned SHA only when they need a stable rollout point.
+`@main` until an approved stable major tag exists. Do not update callers to `@v1` before that tag exists.
+
+Future stable references should use this model:
+
+- `@v1` for backward-compatible workflow-contract changes after the major tag is approved
+- immutable release tags such as `@v1.2.0` when a caller needs a fixed release point
+- exact commit SHAs for especially sensitive deployment paths or temporary staged rollouts
+- `@v2` only for breaking workflow-contract changes
+
+The historical auto-release workflow remains the backfill and repair tool. Release Please manages future
+`shared-automation` releases after the `v1.1.0` handoff point recorded in `release-please-config.json`.
