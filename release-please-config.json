@@ -1,0 +1,10 @@
+{
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "last-release-sha": "96e8cee8ba4122957d9ec5fd4b50d34df35cfce2",
+  "packages": {
+    ".": {
+      "release-type": "simple"
+    }
+  }
+}

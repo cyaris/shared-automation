@@ -7,17 +7,21 @@ on:
       - main
     paths:
       - ".github/actions/**"
-      - ".github/workflows/**"
       - ".github/release-policy.yml"
+      - ".github/workflows/**"
+      - ".release-please-manifest.json"
       - "AGENTS.md"
       - "README.md"
+      - "release-please-config.json"
   pull_request:
     paths:
       - ".github/actions/**"
-      - ".github/workflows/**"
       - ".github/release-policy.yml"
+      - ".github/workflows/**"
+      - ".release-please-manifest.json"
       - "AGENTS.md"
       - "README.md"
+      - "release-please-config.json"
   workflow_dispatch:
 
 permissions:
@@ -55,6 +59,20 @@ jobs:
       - name: Run actionlint
         run: |
           "$HOME/go/bin/actionlint" -color
+
+  json-config:
+    needs: validate-manual-dispatch
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Validate JSON configuration
+        run: |
+          node -e "for (const file of ['.release-please-manifest.json', 'release-please-config.json']) JSON.parse(require('fs').readFileSync(file, 'utf8'))"
 
   zizmor:
     needs: validate-manual-dispatch
