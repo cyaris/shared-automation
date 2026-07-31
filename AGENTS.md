@@ -13,6 +13,10 @@
 - Keep shared CI, rollup upload, auto-create-dev-PR, and auto-release implementation changes in this repository. Caller repositories should keep thin local wrapper workflows that define triggers, permissions, inputs, secrets, and repository-specific values before calling the reusable workflow here.
 - Keep reusable workflow defaults general. Caller-specific commands, local dependency refs, bundle file lists, metadata refresh files, branch selections, S3 prefixes, and release naming or milestone overrides belong in caller workflow inputs or caller release-policy files.
 - Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
+- Keep Release Please execution local to each repository by default. Repository-local `release-please.yml`,
+  `release-please-config.json`, and `.release-please-manifest.json` files should own that repository's default branch,
+  historical handoff SHA, manifest version, and future release state; shared rules here should cover conventions rather
+  than hiding that state behind another reusable workflow.
 - Do not move a repository-specific workflow implementation into this repository unless another repository will share the same behavior.
 - Manual `workflow_dispatch` paths must remain restricted to the `cyaris` GitHub actor by default.
 
@@ -49,6 +53,9 @@
   permissions, or paid services that are not configured. Apply this to dry-run modes too: a dry run may avoid external
   writes, but it should still prove that required credentials exist unless the feature is explicitly documented as
   credential-optional.
+- Use accurate Conventional Commit subjects for changes that Release Please should classify. Do not inflate routine work
+  into release-triggering types: use types such as `chore:`, `ci:`, `docs:`, `test:`, or `refactor:` for maintenance,
+  and reserve `feat:`, `fix:`, `perf:`, and breaking-change syntax for changes that genuinely match those meanings.
 - For rollup upload callers, pushes to `main` or `master` should run production uploads. Manual dispatch should keep
   staged uploads as the default unless `production` is explicitly selected.
 
