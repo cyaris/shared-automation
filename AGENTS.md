@@ -10,7 +10,7 @@
 
 - Keep reusable workflow implementations in `.github/workflows`.
 - Keep composite GitHub Actions in `.github/actions`.
-- Keep shared CI, rollup, rollup upload, auto-create-dev-PR, and auto-release implementation changes in this repository. Caller repositories should keep thin local wrapper workflows that define triggers, permissions, inputs, secrets, and repository-specific values before calling the reusable workflow here.
+- Keep shared CI, rollup, auto-create-dev-PR, and auto-release implementation changes in this repository. Caller repositories should keep thin local wrapper workflows that define triggers, permissions, inputs, secrets, and repository-specific values before calling the reusable workflow here.
 - Keep reusable workflow defaults general. Caller-specific commands, local dependency refs, bundle file lists, metadata refresh files, branch selections, S3 prefixes, and release naming or milestone overrides belong in caller workflow inputs or caller release-policy files.
 - Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
 - Keep Release Please execution local to each repository by default. Repository-local `release-please.yml`,
@@ -44,9 +44,6 @@
   and validated spec lines. Do not expose arbitrary shell command strings as caller inputs unless a documented caller
   need cannot be expressed through fixed package scripts or structured configuration; keep shared CI validation on fixed
   npm scripts controlled by boolean inputs.
-- For rollup-upload caller README sections, describe the local upload trigger, S3 destination, bundle files, production
-  or staged naming, and repository-specific dependency refs, then link to the shared workflow description for upload
-  behavior, inputs, and secrets.
 - For rollup caller README sections, describe the local CI triggers, upload trigger, S3 destination, bundle files,
   production or staged naming, and repository-specific dependency refs, then link to the shared workflow description for
   combined CI and upload behavior, inputs, and secrets.

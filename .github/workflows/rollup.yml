@@ -259,30 +259,61 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: ./.github/workflows/rollup-upload.yml
-    with:
-      working-directory: ${{ inputs.working-directory }}
-      dist-directory: ${{ inputs.dist-directory }}
-      bundle-files: ${{ inputs.bundle-files }}
-      s3-bucket: ${{ inputs.s3-bucket }}
-      s3-prefix: ${{ inputs.s3-prefix }}
-      aws-region: ${{ inputs.aws-region }}
-      aws-role-to-assume: ${{ inputs.aws-role-to-assume }}
-      production: ${{ needs.resolve-inputs.outputs.production == 'true' }}
-      dry-run: ${{ needs.resolve-inputs.outputs.dry_run == 'true' }}
-      sync-dist-extras: ${{ inputs.sync-dist-extras }}
-      cache-control: ${{ inputs.cache-control }}
-      metadata-refresh-files: ${{ inputs.metadata-refresh-files }}
-      node-version: ${{ inputs.node-version }}
-      shared-automation-repository: ${{ inputs.shared-automation-repository }}
-      shared-automation-ref: ${{ inputs.shared-automation-ref }}
-      svelte-lib-repository: ${{ inputs.svelte-lib-repository }}
-      svelte-lib-ref: ${{ needs.resolve-inputs.outputs.svelte_lib_ref }}
-      local-dependency-repositories: ${{ inputs.rollup-local-dependency-repositories }}
-      allowed-dispatch-actor: ${{ inputs.allowed-dispatch-actor }}
-    secrets:
-      CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN }}
-      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate manual dispatcher
+        if: ${{ github.event_name == 'workflow_dispatch' && github.actor != inputs['allowed-dispatch-actor'] }}
+        env:
+          ALLOWED_DISPATCH_ACTOR: ${{ inputs['allowed-dispatch-actor'] }}
+        run: |
+          printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
+          exit 1
+
+      - name: Checkout caller repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          path: ${{ github.event.repository.name }}
+          persist-credentials: false
+
+      - name: Checkout svelte-lib
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: ${{ inputs.svelte-lib-repository }}
+          ref: ${{ needs.resolve-inputs.outputs.svelte_lib_ref }}
+          path: svelte-lib
+          token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Checkout shared automation
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: ${{ inputs.shared-automation-repository }}
+          ref: ${{ inputs.shared-automation-ref }}
+          path: shared-automation
+          token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Rollup and upload embedded bundle
+        uses: ./shared-automation/.github/actions/rollup-upload
+        with:
+          caller-repository-name: ${{ github.event.repository.name }}
+          working-directory: ${{ inputs.working-directory }}
+          dist-directory: ${{ inputs.dist-directory }}
+          bundle-files: ${{ inputs.bundle-files }}
+          s3-bucket: ${{ inputs.s3-bucket }}
+          s3-prefix: ${{ inputs.s3-prefix }}
+          aws-region: ${{ inputs.aws-region }}
+          aws-role-to-assume: ${{ inputs.aws-role-to-assume }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          production: ${{ needs.resolve-inputs.outputs.production == 'true' }}
+          dry-run: ${{ needs.resolve-inputs.outputs.dry_run == 'true' }}
+          sync-dist-extras: ${{ inputs.sync-dist-extras }}
+          cache-control: ${{ inputs.cache-control }}
+          metadata-refresh-files: ${{ inputs.metadata-refresh-files }}
+          node-version: ${{ inputs.node-version }}
+          svelte-lib-directory: svelte-lib
+          checkout-token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
+          local-dependency-repositories: ${{ inputs.rollup-local-dependency-repositories }}
