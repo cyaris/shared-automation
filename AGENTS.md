@@ -92,3 +92,5 @@
 - Treat `actionlint` failures as workflow contract or syntax issues to fix before rollout.
 - Treat `zizmor` findings as security-review prompts. Fix true positives, document accepted risks, and avoid broad
   suppressions.
+- Keep third-party GitHub Actions hash-pinned when `zizmor` requires it, but do not force downstream
+  `cyaris/shared-automation` reusable workflow callers to use raw commit SHAs before an approved stable major tag exists.
