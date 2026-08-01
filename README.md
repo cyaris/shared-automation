@@ -14,6 +14,49 @@ Reusable workflow and composite-action contracts use structured inputs such as b
 validated spec lines. They avoid caller-provided shell command strings unless a documented repository need cannot be
 expressed through fixed package scripts or structured configuration.
 
+## Renovate
+
+Renovate dependency automation is prepared through the shared preset in `default.json`. Participating repositories keep
+small local `renovate.json` files that extend `github>cyaris/shared-automation`, so common grouping, scheduling, labels,
+and ignored generated paths stay centralized while repository-local overrides remain possible.
+
+The shared preset covers:
+
+- npm dependency and lockfile updates
+- GitHub Actions and reusable workflow references
+- lockfile maintenance before 6am on Mondays in `America/Chicago`
+- grouped minor and patch npm updates for production and development dependencies
+- grouped GitHub Actions updates, including `cyaris/shared-automation` workflow references
+- generated and vendored path exclusions for `node_modules`, `_site`, `.svelte-kit`, `dist`, and `build`
+
+Third-party GitHub Actions should use hash pins with readable major-version comments, then rely on Renovate for future
+updates. Reusable workflow callers may keep `cyaris/shared-automation` refs on `main` until a stable shared workflow tag
+such as `v1` is created and selected for rollout. Repository-specific action families, such as GitHub Pages actions in
+`cyaris.github.io`, may stay on their own supported major versions when they do not overlap with shared workflow
+implementation actions.
+
+Renovate automerge is not enabled. Dependency updates should arrive as reviewable pull requests unless a repository
+adds an explicit local automerge policy later.
+
+Remote setup is still required before Renovate runs. Install the Renovate GitHub App for each participating repository,
+and grant the app access to `cyaris/shared-automation` so it can resolve the shared preset. For private repositories,
+the app must be allowed to read both the target repository and this preset repository.
+
+## Branch Model
+
+Use `main` for stable reusable workflow definitions and `dev` for proposed changes. Dependent repositories should call
+`@main` until an approved stable major tag exists. Do not update callers to `@v1` before that tag exists.
+
+Future stable references should use this model:
+
+- `@v1` for backward-compatible workflow-contract changes after the major tag is approved
+- immutable release tags such as `@v1.2.0` when a caller needs a fixed release point
+- exact commit SHAs for especially sensitive deployment paths or temporary staged rollouts
+- `@v2` only for breaking workflow-contract changes
+
+The historical auto-release workflow remains the backfill and repair tool. Release Please manages future
+`shared-automation` releases after the `v1.1.0` handoff point recorded in `release-please-config.json`.
+
 ## Workflows
 
 ### `.github/workflows/auto-create-dev-pr.yml`
@@ -264,46 +307,3 @@ Important inputs:
 Pure thin-caller repositories do not need a local wrapper by default. Add one when a repository owns local shell logic,
 deployment permissions, Pages deployment steps, rollup resolver behavior, or other workflow behavior that should be
 validated before merge.
-
-## Renovate
-
-Renovate dependency automation is prepared through the shared preset in `default.json`. Participating repositories keep
-small local `renovate.json` files that extend `github>cyaris/shared-automation`, so common grouping, scheduling, labels,
-and ignored generated paths stay centralized while repository-local overrides remain possible.
-
-The shared preset covers:
-
-- npm dependency and lockfile updates
-- GitHub Actions and reusable workflow references
-- lockfile maintenance before 6am on Mondays in `America/Chicago`
-- grouped minor and patch npm updates for production and development dependencies
-- grouped GitHub Actions updates, including `cyaris/shared-automation` workflow references
-- generated and vendored path exclusions for `node_modules`, `_site`, `.svelte-kit`, `dist`, and `build`
-
-Third-party GitHub Actions should use hash pins with readable major-version comments, then rely on Renovate for future
-updates. Reusable workflow callers may keep `cyaris/shared-automation` refs on `main` until a stable shared workflow tag
-such as `v1` is created and selected for rollout. Repository-specific action families, such as GitHub Pages actions in
-`cyaris.github.io`, may stay on their own supported major versions when they do not overlap with shared workflow
-implementation actions.
-
-Renovate automerge is not enabled. Dependency updates should arrive as reviewable pull requests unless a repository
-adds an explicit local automerge policy later.
-
-Remote setup is still required before Renovate runs. Install the Renovate GitHub App for each participating repository,
-and grant the app access to `cyaris/shared-automation` so it can resolve the shared preset. For private repositories,
-the app must be allowed to read both the target repository and this preset repository.
-
-## Branch Model
-
-Use `main` for stable reusable workflow definitions and `dev` for proposed changes. Dependent repositories should call
-`@main` until an approved stable major tag exists. Do not update callers to `@v1` before that tag exists.
-
-Future stable references should use this model:
-
-- `@v1` for backward-compatible workflow-contract changes after the major tag is approved
-- immutable release tags such as `@v1.2.0` when a caller needs a fixed release point
-- exact commit SHAs for especially sensitive deployment paths or temporary staged rollouts
-- `@v2` only for breaking workflow-contract changes
-
-The historical auto-release workflow remains the backfill and repair tool. Release Please manages future
-`shared-automation` releases after the `v1.1.0` handoff point recorded in `release-please-config.json`.
