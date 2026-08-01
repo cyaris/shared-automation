@@ -1,0 +1,319 @@
+name: Shared Rollup
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Directory containing the package.json to validate and roll up.
+        required: false
+        type: string
+        default: .
+      dist-directory:
+        description: Dist directory, relative to the repository root.
+        required: false
+        type: string
+        default: dist
+      bundle-files:
+        description: Newline-separated bundle file specs as path:content-type, relative to dist-directory.
+        required: true
+        type: string
+      s3-bucket:
+        description: Destination S3 bucket.
+        required: false
+        type: string
+        default: cyaris.github.io
+      s3-prefix:
+        description: Destination prefix inside the S3 bucket.
+        required: true
+        type: string
+      aws-region:
+        description: AWS region for S3 and STS calls.
+        required: false
+        type: string
+        default: us-east-2
+      aws-role-to-assume:
+        description: Optional AWS role ARN for OIDC authentication. If omitted, AWS access key secrets are used.
+        required: false
+        type: string
+        default: ""
+      manual-production:
+        description: Manual dispatch production input from the caller wrapper.
+        required: false
+        type: boolean
+        default: false
+      manual-dry-run:
+        description: Manual dispatch dry-run input from the caller wrapper.
+        required: false
+        type: boolean
+        default: false
+      manual-svelte-lib-ref:
+        description: Manual dispatch svelte-lib ref input from the caller wrapper.
+        required: false
+        type: string
+        default: ""
+      svelte-lib-variable-ref:
+        description: Caller repository SVELTE_LIB_REF variable value.
+        required: false
+        type: string
+        default: ""
+      sync-dist-extras:
+        description: Sync non-bundle files from dist-directory to the S3 prefix.
+        required: false
+        type: boolean
+        default: false
+      cache-control:
+        description: Cache-Control metadata for uploaded bundle and optional extra files.
+        required: false
+        type: string
+        default: no-cache, max-age=0, must-revalidate
+      metadata-refresh-files:
+        description: Optional newline-separated S3 object specs as key:content-type to refresh metadata in place.
+        required: false
+        type: string
+        default: ""
+      node-version:
+        description: Node.js version used for npm installs and builds.
+        required: false
+        type: string
+        default: "24"
+      shared-automation-repository:
+        description: Repository containing the shared rollup upload action.
+        required: false
+        type: string
+        default: cyaris/shared-automation
+      shared-automation-ref:
+        description: Ref used to checkout the shared rollup upload action.
+        required: false
+        type: string
+        default: main
+      svelte-lib-repository:
+        description: Repository containing svelte-lib.
+        required: false
+        type: string
+        default: cyaris/svelte-lib
+      additional-ci-local-dependency-repositories:
+        description: Optional newline-separated local dependency specs to add after svelte-lib in the CI job.
+        required: false
+        type: string
+        default: ""
+      rollup-local-dependency-repositories:
+        description: Optional newline-separated local dependency specs for the rollup upload job as owner/repo:path:ref.
+        required: false
+        type: string
+        default: ""
+      production-ref-requirements:
+        description: Optional newline-separated production ref requirements as NAME=ref.
+        required: false
+        type: string
+        default: ""
+      run-format:
+        description: Run npm run format:check during CI.
+        required: false
+        type: boolean
+        default: true
+      run-lint:
+        description: Run npm run lint during CI.
+        required: false
+        type: boolean
+        default: true
+      run-check:
+        description: Run npm run check during CI.
+        required: false
+        type: boolean
+        default: true
+      run-build:
+        description: Run npm run build during CI.
+        required: false
+        type: boolean
+        default: true
+      allowed-dispatch-actor:
+        description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
+        required: false
+        type: string
+        default: cyaris
+    secrets:
+      CHECKOUT_TOKEN:
+        description: Optional token with access to private dependency repositories.
+        required: false
+      RELEASE_TOKEN:
+        description: Optional fallback token with access to private dependency repositories.
+        required: false
+      AWS_ACCESS_KEY_ID:
+        description: AWS access key used when aws-role-to-assume is omitted.
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        description: AWS secret key used when aws-role-to-assume is omitted.
+        required: false
+      AWS_SESSION_TOKEN:
+        description: Optional AWS session token used when aws-role-to-assume is omitted.
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  resolve-inputs:
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      ci_local_dependency_repositories: ${{ steps.values.outputs.ci_local_dependency_repositories }}
+      dry_run: ${{ steps.values.outputs.dry_run }}
+      production: ${{ steps.values.outputs.production }}
+      run_upload: ${{ steps.values.outputs.run_upload }}
+      svelte_lib_ref: ${{ steps.values.outputs.svelte_lib_ref }}
+    steps:
+      - id: values
+        env:
+          ADDITIONAL_CI_LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.additional-ci-local-dependency-repositories }}
+          INPUT_DRY_RUN: ${{ inputs.manual-dry-run }}
+          INPUT_PRODUCTION: ${{ inputs.manual-production }}
+          INPUT_SVELTE_LIB_REF: ${{ inputs.manual-svelte-lib-ref }}
+          PRODUCTION_REF_REQUIREMENTS: ${{ inputs.production-ref-requirements }}
+          SVELTE_LIB_REPOSITORY: ${{ inputs.svelte-lib-repository }}
+          VAR_SVELTE_LIB_REF: ${{ inputs.svelte-lib-variable-ref }}
+        run: |
+          set -euo pipefail
+
+          production="$INPUT_PRODUCTION"
+          dry_run="$INPUT_DRY_RUN"
+          run_upload="false"
+          default_svelte_lib_ref="main"
+
+          if [[ "${GITHUB_BASE_REF:-}" == "dev" || "${GITHUB_HEAD_REF:-}" == "dev" || "${GITHUB_REF_NAME:-}" == "dev" ]]; then
+            default_svelte_lib_ref="dev"
+          fi
+
+          svelte_lib_ref="${INPUT_SVELTE_LIB_REF:-${VAR_SVELTE_LIB_REF:-$default_svelte_lib_ref}}"
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            run_upload="true"
+          fi
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" && ( "$GITHUB_REF_NAME" == "main" || "$GITHUB_REF_NAME" == "master" ) ]]; then
+            run_upload="true"
+            svelte_lib_ref="${VAR_SVELTE_LIB_REF:-$default_svelte_lib_ref}"
+            production="true"
+            dry_run="false"
+          fi
+
+          if [[ "$production" == "true" && ! "$svelte_lib_ref" =~ ^[0-9a-f]{40}$ ]]; then
+            printf "Production uploads require SVELTE_LIB_REF or svelte-lib-ref to be a pinned 40-character commit SHA.\n" >&2
+            exit 1
+          fi
+
+          while IFS= read -r spec; do
+            spec="${spec#"${spec%%[![:space:]]*}"}"
+            spec="${spec%"${spec##*[![:space:]]}"}"
+
+            if [[ -z "$spec" ]]; then
+              continue
+            fi
+
+            name="${spec%%=*}"
+            ref="${spec#*=}"
+
+            if [[ -z "$name" || -z "$ref" || "$name" == "$ref" ]]; then
+              printf "Invalid production ref requirement: %s\n" "$spec" >&2
+              exit 1
+            fi
+
+            if [[ "$production" == "true" && ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+              printf "Production uploads require %s to be a pinned 40-character commit SHA.\n" "$name" >&2
+              exit 1
+            fi
+          done <<< "$PRODUCTION_REF_REQUIREMENTS"
+
+          {
+            printf "ci_local_dependency_repositories<<ROLLUP_CI_DEPS\n"
+            printf "%s:svelte-lib:%s\n" "$SVELTE_LIB_REPOSITORY" "$svelte_lib_ref"
+            printf "%s\n" "$ADDITIONAL_CI_LOCAL_DEPENDENCY_REPOSITORIES"
+            printf "ROLLUP_CI_DEPS\n"
+            printf "dry_run=%s\n" "$dry_run"
+            printf "production=%s\n" "$production"
+            printf "run_upload=%s\n" "$run_upload"
+            printf "svelte_lib_ref=%s\n" "$svelte_lib_ref"
+          } >> "$GITHUB_OUTPUT"
+
+  node-package-ci:
+    needs: resolve-inputs
+    uses: ./.github/workflows/ci.yml
+    with:
+      working-directory: ${{ inputs.working-directory }}
+      node-version: ${{ inputs.node-version }}
+      local-dependency-repositories: ${{ needs.resolve-inputs.outputs.ci_local_dependency_repositories }}
+      run-format: ${{ inputs.run-format }}
+      run-lint: ${{ inputs.run-lint }}
+      run-check: ${{ inputs.run-check }}
+      run-build: ${{ inputs.run-build }}
+      allowed-dispatch-actor: ${{ inputs.allowed-dispatch-actor }}
+    secrets:
+      CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN }}
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  rollup-upload:
+    needs:
+      - node-package-ci
+      - resolve-inputs
+    if: needs.resolve-inputs.outputs.run_upload == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate manual dispatcher
+        if: ${{ github.event_name == 'workflow_dispatch' && github.actor != inputs['allowed-dispatch-actor'] }}
+        env:
+          ALLOWED_DISPATCH_ACTOR: ${{ inputs['allowed-dispatch-actor'] }}
+        run: |
+          printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
+          exit 1
+
+      - name: Checkout caller repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          path: ${{ github.event.repository.name }}
+          persist-credentials: false
+
+      - name: Checkout svelte-lib
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: ${{ inputs.svelte-lib-repository }}
+          ref: ${{ needs.resolve-inputs.outputs.svelte_lib_ref }}
+          path: svelte-lib
+          token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Checkout shared automation
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: ${{ inputs.shared-automation-repository }}
+          ref: ${{ inputs.shared-automation-ref }}
+          path: shared-automation
+          token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Rollup and upload embedded bundle
+        uses: ./shared-automation/.github/actions/rollup-upload
+        with:
+          caller-repository-name: ${{ github.event.repository.name }}
+          working-directory: ${{ inputs.working-directory }}
+          dist-directory: ${{ inputs.dist-directory }}
+          bundle-files: ${{ inputs.bundle-files }}
+          s3-bucket: ${{ inputs.s3-bucket }}
+          s3-prefix: ${{ inputs.s3-prefix }}
+          aws-region: ${{ inputs.aws-region }}
+          aws-role-to-assume: ${{ inputs.aws-role-to-assume }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          production: ${{ needs.resolve-inputs.outputs.production == 'true' }}
+          dry-run: ${{ needs.resolve-inputs.outputs.dry_run == 'true' }}
+          sync-dist-extras: ${{ inputs.sync-dist-extras }}
+          cache-control: ${{ inputs.cache-control }}
+          metadata-refresh-files: ${{ inputs.metadata-refresh-files }}
+          node-version: ${{ inputs.node-version }}
+          svelte-lib-directory: svelte-lib
+          checkout-token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
+          local-dependency-repositories: ${{ inputs.rollup-local-dependency-repositories }}

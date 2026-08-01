@@ -174,6 +174,39 @@ Optional secret:
 
 - `CHECKOUT_TOKEN` for reading private dependency repositories
 
+### `.github/workflows/rollup.yml`
+
+Reusable Rollup workflow for Svelte apps that need both shared CI validation and embedded bundle uploads. It resolves
+standard `svelte-lib` refs, runs the shared CI workflow first, then runs the shared rollup upload action only for manual
+dispatches or pushes to `main` or `master`. Caller wrappers still own triggers, manual input declarations, S3
+destinations, bundle lists, extra dependency refs, and caller repository variables.
+
+Important inputs:
+
+- CI inputs: `working-directory`, `node-version`, `run-format`, `run-lint`, `run-check`, `run-build`, and
+  `additional-ci-local-dependency-repositories`
+- Upload inputs: `dist-directory`, `bundle-files`, `s3-bucket`, `s3-prefix`, `aws-region`, `aws-role-to-assume`,
+  `manual-production`, `manual-dry-run`, `sync-dist-extras`, `cache-control`, `metadata-refresh-files`,
+  `svelte-lib-repository`, `manual-svelte-lib-ref`, `svelte-lib-variable-ref`, and
+  `rollup-local-dependency-repositories`
+- `production-ref-requirements` as `NAME=ref` lines for additional local dependencies that must be pinned in production
+- `allowed-dispatch-actor`, defaulting to `cyaris`
+
+The composite upload implementation lives at `.github/actions/rollup-upload/action.yml`. AWS OIDC is the preferred
+authentication path. Rollup caller repositories should store the role ARN in a repository variable such as
+`AWS_ROLLUP_UPLOAD_ROLE_ARN`, pass it to `aws-role-to-assume`, and grant only `contents: read` and `id-token: write` on
+the job that calls `.github/workflows/rollup.yml`. If `aws-role-to-assume` is blank, the action falls back to static AWS
+access-key secrets. Dry runs validate that one of those credential paths exists, because a dry run should prove the
+configured deployment credentials are available even though it does not write S3 objects.
+
+Optional secrets:
+
+- `CHECKOUT_TOKEN` for reading private dependency repositories
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` when `aws-role-to-assume` is omitted
+
+Private dependency note: callers that install private repositories through local `file:` dependencies need a
+checkout-capable token.
+
 ### `.github/workflows/workflow-validation.yml`
 
 Reusable workflow validation for GitHub Actions and automation configuration. It runs on changes to workflow,
@@ -259,42 +292,6 @@ adds an explicit local automerge policy later.
 Remote setup is still required before Renovate runs. Install the Renovate GitHub App for each participating repository,
 and grant the app access to `cyaris/shared-automation` so it can resolve the shared preset. For private repositories,
 the app must be allowed to read both the target repository and this preset repository.
-
-### `.github/workflows/rollup-upload.yml`
-
-Reusable embedded bundle workflow. It checks out the caller repository, checks out `svelte-lib` as a local dependency,
-checks out this repository for the composite upload action, then builds and uploads configured bundle files to S3.
-It uploads only `bundle-files` by default; callers that need additional generated assets can opt into
-`sync-dist-extras`.
-
-The composite action implementation lives at `.github/actions/rollup-upload/action.yml`.
-
-Important inputs:
-
-- `working-directory` and `dist-directory`
-- `bundle-files` as `path:content-type` lines
-- `s3-bucket`, `s3-prefix`, and `aws-region`
-- `aws-role-to-assume` for AWS OIDC authentication; using it requires `id-token: write`, and caller wrappers must grant
-  that permission on the job that calls this reusable workflow
-- `production`, `dry-run`, `sync-dist-extras`, `cache-control`, and `metadata-refresh-files`
-- `shared-automation-repository` and `shared-automation-ref` for the composite action checkout
-- `svelte-lib-repository` and `svelte-lib-ref` for the local `svelte-lib` dependency checkout
-- optional `local-dependency-repositories` entries as `owner/repo:path:ref`
-- `allowed-dispatch-actor`, defaulting to `cyaris`
-
-AWS OIDC is the preferred authentication path. Rollup caller repositories should store the role ARN in a repository
-variable such as `AWS_ROLLUP_UPLOAD_ROLE_ARN`, pass it to `aws-role-to-assume`, and grant only `contents: read` and
-`id-token: write` on the upload job. If `aws-role-to-assume` is blank, the workflow falls back to static AWS access-key
-secrets. Dry runs validate that one of those credential paths exists, because a dry run should prove the configured
-deployment credentials are available even though it does not write S3 objects.
-
-Optional secrets:
-
-- `CHECKOUT_TOKEN` for reading private dependency repositories
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` when `aws-role-to-assume` is omitted
-
-Private dependency note: callers that install private repositories through local `file:` dependencies need a
-checkout-capable token.
 
 ## Branch Model
 

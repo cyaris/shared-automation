@@ -10,7 +10,7 @@
 
 - Keep reusable workflow implementations in `.github/workflows`.
 - Keep composite GitHub Actions in `.github/actions`.
-- Keep shared CI, rollup upload, auto-create-dev-PR, and auto-release implementation changes in this repository. Caller repositories should keep thin local wrapper workflows that define triggers, permissions, inputs, secrets, and repository-specific values before calling the reusable workflow here.
+- Keep shared CI, rollup, auto-create-dev-PR, and auto-release implementation changes in this repository. Caller repositories should keep thin local wrapper workflows that define triggers, permissions, inputs, secrets, and repository-specific values before calling the reusable workflow here.
 - Keep reusable workflow defaults general. Caller-specific commands, local dependency refs, bundle file lists, metadata refresh files, branch selections, S3 prefixes, and release naming or milestone overrides belong in caller workflow inputs or caller release-policy files.
 - Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
 - Keep Release Please execution local to each repository by default. Repository-local `release-please.yml`,
@@ -44,15 +44,15 @@
   and validated spec lines. Do not expose arbitrary shell command strings as caller inputs unless a documented caller
   need cannot be expressed through fixed package scripts or structured configuration; keep shared CI validation on fixed
   npm scripts controlled by boolean inputs.
-- For rollup-upload caller README sections, describe the local upload trigger, S3 destination, bundle files, production
-  or staged naming, and repository-specific dependency refs, then link to the shared workflow description for upload
-  behavior, inputs, and secrets.
+- For rollup caller README sections, describe the local CI triggers, upload trigger, S3 destination, bundle files,
+  production or staged naming, and repository-specific dependency refs, then link to the shared workflow description for
+  combined CI and upload behavior, inputs, and secrets.
 - For workflow-validation caller README sections, describe that the local wrapper validates repository-owned workflow
   logic, then link to the shared workflow description for actionlint, JSON config, and zizmor behavior.
 
 ## Caller Workflow Expectations
 
-- Caller repositories should keep root `CI`, `Rollup upload`, `Auto-create dev pull request`, and `Auto release` workflows as thin callers of this repository's reusable workflows whenever those shared workflows cover the needed behavior.
+- Caller repositories should keep root `Rollup`, `Auto-create dev pull request`, and `Auto release` workflows as thin callers of this repository's reusable workflows whenever those shared workflows cover the needed behavior.
 - Workflows must fail clearly when a requested feature requires credentials, secrets, repository variables, external
   permissions, or paid services that are not configured. Apply this to dry-run modes too: a dry run may avoid external
   writes, but it should still prove that required credentials exist unless the feature is explicitly documented as
