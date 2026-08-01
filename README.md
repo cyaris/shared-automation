@@ -174,6 +174,24 @@ Optional secret:
 
 - `CHECKOUT_TOKEN` for reading private dependency repositories
 
+### `.github/workflows/rollup.yml`
+
+Reusable Rollup workflow for Svelte apps that need both shared CI validation and embedded bundle uploads. It resolves
+standard `svelte-lib` refs, runs the shared CI workflow first, then runs the shared rollup-upload workflow only for manual
+dispatches or pushes to `main` or `master`. Caller wrappers still own triggers, manual input declarations, S3
+destinations, bundle lists, extra dependency refs, and caller repository variables.
+
+Important inputs:
+
+- CI inputs: `working-directory`, `node-version`, `run-format`, `run-lint`, `run-check`, `run-build`, and
+  `additional-ci-local-dependency-repositories`
+- Upload inputs: `dist-directory`, `bundle-files`, `s3-bucket`, `s3-prefix`, `aws-region`, `aws-role-to-assume`,
+  `manual-production`, `manual-dry-run`, `sync-dist-extras`, `cache-control`, `metadata-refresh-files`,
+  `svelte-lib-repository`, `manual-svelte-lib-ref`, `svelte-lib-variable-ref`, and
+  `rollup-local-dependency-repositories`
+- `production-ref-requirements` as `NAME=ref` lines for additional local dependencies that must be pinned in production
+- `allowed-dispatch-actor`, defaulting to `cyaris`
+
 ### `.github/workflows/workflow-validation.yml`
 
 Reusable workflow validation for GitHub Actions and automation configuration. It runs on changes to workflow,
