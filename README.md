@@ -247,6 +247,12 @@ The shared preset covers:
 - grouped GitHub Actions updates, including `cyaris/shared-automation` workflow references
 - generated and vendored path exclusions for `node_modules`, `_site`, `.svelte-kit`, `dist`, and `build`
 
+Third-party GitHub Actions should use hash pins with readable major-version comments, then rely on Renovate for future
+updates. Reusable workflow callers may keep `cyaris/shared-automation` refs on `main` until a stable shared workflow tag
+such as `v1` is created and selected for rollout. Repository-specific action families, such as GitHub Pages actions in
+`cyaris.github.io`, may stay on their own supported major versions when they do not overlap with shared workflow
+implementation actions.
+
 Renovate automerge is not enabled. Dependency updates should arrive as reviewable pull requests unless a repository
 adds an explicit local automerge policy later.
 
