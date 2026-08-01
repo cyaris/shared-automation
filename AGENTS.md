@@ -23,6 +23,7 @@
 ## Documentation
 
 - Document every workflow and composite action in `README.md` when adding, renaming, or changing it in a way that affects callers.
+- Keep GitHub Actions workflow sections as the final top-level section in caller README files.
 - Keep README and AGENTS guidance focused on current behavior, active requirements, and durable project decisions. Remove
   migration-era notes, deprecated-option explanations, old fallback paths, and historical caveats once they no longer
   affect how someone uses, maintains, deploys, or releases the project. When a state change makes a requirement obsolete,
