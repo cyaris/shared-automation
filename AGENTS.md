@@ -63,6 +63,9 @@
 - Use accurate Conventional Commit subjects for changes that Release Please should classify. Do not inflate routine work
   into release-triggering types: use types such as `chore:`, `ci:`, `docs:`, `test:`, or `refactor:` for maintenance,
   and reserve `feat:`, `fix:`, `perf:`, and breaking-change syntax for changes that genuinely match those meanings.
+- Treat upstream automation, shared workflow reference, dependency-pin, Renovate, and release-policy maintenance as
+  non-release work unless it changes repository user behavior or a published package/runtime API. Use `ci:`, `chore:`,
+  or `docs:` for those changes so Release Please does not create downstream version bumps solely from upstream plumbing.
 - For rollup upload callers, pushes to `main` or `master` should run production uploads. Manual dispatch should keep
   staged uploads as the default unless `production` is explicitly selected.
 
