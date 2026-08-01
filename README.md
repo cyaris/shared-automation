@@ -219,6 +219,10 @@ Validation includes:
 - JSON parsing for configured release and Renovate files
 - GitHub Actions security analysis with `zizmor`
 
+The shared `zizmor` run keeps hash-pinning required for third-party GitHub Actions, but allows
+`cyaris/shared-automation` reusable workflow callers to use normal branch or tag refs while the stable major-tag model is
+being prepared.
+
 Important inputs:
 
 - `json-files`, defaulting to `.release-please-manifest.json`, `release-please-config.json`, and `renovate.json`

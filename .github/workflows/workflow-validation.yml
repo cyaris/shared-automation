@@ -133,4 +133,14 @@ jobs:
       - name: Run zizmor
         env:
           GH_TOKEN: ${{ github.token }}
-        run: zizmor --format=github .
+        run: |
+          cat > "$RUNNER_TEMP/zizmor.yml" <<'EOF'
+          rules:
+            unpinned-uses:
+              config:
+                policies:
+                  cyaris/shared-automation/*: ref-pin
+                  "*": hash-pin
+          EOF
+
+          zizmor --config "$RUNNER_TEMP/zizmor.yml" --format=github .
