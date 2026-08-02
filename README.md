@@ -53,8 +53,9 @@ Future stable references should use this model:
 - exact commit SHAs for especially sensitive deployment paths or temporary staged rollouts
 - `@v2` only for breaking workflow-contract changes
 
-The historical auto-release workflow remains the backfill and repair tool. Release Please manages future
-`shared-automation` releases after the `v1.1.0` handoff point recorded in `release-please-config.json`.
+The auto-release workflow manages release reconciliation for this repository and callers that inherit the shared release
+policy. Release runs decide meaningful release milestones from the repository history and policy instead of relying on
+commit-prefix parsing.
 
 ## Workflows
 
@@ -109,18 +110,6 @@ Local workflow for this repository. It runs on pushes to `dev`, then delegates p
 
 Local workflow for this repository. It runs from manual dispatch only, then delegates release reconciliation to
 `.github/workflows/auto-release.yml`.
-
-### `.github/workflows/release-please.yml`
-
-Local workflow for future releases in this repository. It runs on pushes to `main` and manual dispatches by `cyaris`,
-then uses Release Please with `release-please-config.json` and `.release-please-manifest.json`.
-
-The config starts after the historical `v1.1.0` release SHA, so Release Please does not republish already reconciled
-history. Release Please opens release pull requests and publishes releases after those pull requests are merged.
-
-Dependent repositories use small repository-local Release Please workflows with the official action directly rather than
-a reusable shared wrapper. Their local `release-please-config.json` files own the historical handoff SHA and manifest
-version, which keeps future release ownership close to each repository and avoids another indirection layer.
 
 ### `.github/workflows/auto-release.yml`
 
@@ -261,7 +250,7 @@ checkout-capable token.
 ### `.github/workflows/workflow-validation.yml`
 
 Reusable workflow validation for GitHub Actions and automation configuration. It runs on changes to workflow,
-composite-action, release-policy, release config, Renovate config, and automation documentation files in this repository.
+composite-action, release-policy, Renovate config, and automation documentation files in this repository.
 Dependent repositories with meaningful local workflow logic can call it from a thin local wrapper.
 
 Typical caller wrapper:
@@ -276,15 +265,11 @@ on:
     paths:
       - ".github/release-policy.yml"
       - ".github/workflows/**"
-      - ".release-please-manifest.json"
-      - "release-please-config.json"
       - "renovate.json"
   pull_request:
     paths:
       - ".github/release-policy.yml"
       - ".github/workflows/**"
-      - ".release-please-manifest.json"
-      - "release-please-config.json"
       - "renovate.json"
   workflow_dispatch:
 
@@ -308,7 +293,7 @@ being prepared.
 
 Important inputs:
 
-- `json-files`, defaulting to `.release-please-manifest.json`, `release-please-config.json`, and `renovate.json`
+- `json-files`, defaulting to `renovate.json`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
 Pure thin-caller repositories do not need a local wrapper by default. Add one when a repository owns local shell logic,
