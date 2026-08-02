@@ -80,6 +80,8 @@ permissions:
 jobs:
   auto-create-dev-pr:
     uses: cyaris/shared-automation/.github/workflows/auto-create-dev-pr.yml@main
+    secrets:
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 ```
 
 The reusable job serializes runs with a repository/branch-specific concurrency group. This queues overlapping pushes
@@ -94,7 +96,9 @@ Important inputs:
 
 Optional secret:
 
-- `RELEASE_TOKEN` only when repository Actions settings cannot allow the run-scoped token to create pull requests
+- `RELEASE_TOKEN` for trusted user or agent-authored pull requests. When callers pass this secret, the workflow uses it
+  for branch fetches and `gh pr create`; that keeps dev pull-request checks from requiring approval solely because the
+  default `github-actions[bot]` opened the pull request.
 
 ### `.github/workflows/auto-create-dev-pr-self.yml`
 

@@ -58,6 +58,9 @@
 ## Caller Workflow Expectations
 
 - Caller repositories should keep root `Rollup`, `Auto-create dev pull request`, and `Auto release` workflows as thin callers of this repository's reusable workflows whenever those shared workflows cover the needed behavior.
+- Auto-create-dev-pr callers with a repository `RELEASE_TOKEN` secret should pass that secret explicitly to the shared
+  workflow. Use that token for trusted user or agent-authored dev PRs so downstream pull-request checks do not require
+  manual approval solely because the pull request was opened by `github-actions[bot]`.
 - Workflows must fail clearly when a requested feature requires credentials, secrets, repository variables, external
   permissions, or paid services that are not configured. Apply this to dry-run modes too: a dry run may avoid external
   writes, but it should still prove that required credentials exist unless the feature is explicitly documented as
