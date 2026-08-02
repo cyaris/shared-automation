@@ -70,10 +70,10 @@
   and do not exaggerate routine maintenance as user-facing work.
 - Treat upstream automation, shared workflow reference, dependency-pin, Renovate, and release-policy maintenance as
   non-release work unless it changes repository user behavior or a published package/runtime API.
-- For rollup upload callers, pushes to `main` or `master` should run production uploads. Manual dispatch should keep
-  staged uploads as the default unless `production` is explicitly selected.
-- Keep `dev` push triggers only for workflows whose purpose is specifically dev-branch automation, such as
-  `auto-create-dev-pr`. CI, build, Rollup, Pages, and workflow-validation jobs should rely on pull-request checks for
+- For rollup upload callers, pushes or manual dispatches from `main` or `master` should run production uploads with
+  unprefixed bundle names. Pushes or manual dispatches from `dev` should run staged uploads with `test_bundle.*` names.
+- Keep non-Rollup `dev` push triggers only for workflows whose purpose is specifically dev-branch automation, such as
+  `auto-create-dev-pr`. CI, build, Pages, and workflow-validation jobs should rely on pull-request checks for
   dev-to-production changes and production-branch push checks after merge unless a repository documents a specific need.
 
 ## Dependency Automation

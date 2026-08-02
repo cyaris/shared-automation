@@ -44,7 +44,7 @@ inputs:
     required: false
     default: ""
   production:
-    description: Upload bundle.* names instead of staged test_bundle.* names.
+    description: Upload with production bundle names.
     required: false
     default: "false"
   dry-run:

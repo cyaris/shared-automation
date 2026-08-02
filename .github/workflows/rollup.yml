@@ -36,11 +36,6 @@ on:
         required: false
         type: string
         default: ""
-      manual-production:
-        description: Manual dispatch production input from the caller wrapper.
-        required: false
-        type: boolean
-        default: false
       manual-dry-run:
         description: Manual dispatch dry-run input from the caller wrapper.
         required: false
@@ -154,7 +149,6 @@ jobs:
           ADDITIONAL_CI_LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.additional-ci-local-dependency-repositories }}
           CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN }}
           INPUT_DRY_RUN: ${{ inputs.manual-dry-run }}
-          INPUT_PRODUCTION: ${{ inputs.manual-production }}
           ROLLUP_LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.rollup-local-dependency-repositories }}
           SVELTE_LIB_REPOSITORY: ${{ inputs.svelte-lib-repository }}
         run: |
@@ -215,19 +209,22 @@ jobs:
             done <<< "$specs"
           }
 
-          production="$INPUT_PRODUCTION"
+          production="false"
           dry_run="$INPUT_DRY_RUN"
           run_upload="false"
           default_svelte_lib_ref="main"
           svelte_lib_ref="$default_svelte_lib_ref"
 
+          if [[ "$GITHUB_REF_NAME" == "main" || "$GITHUB_REF_NAME" == "master" ]]; then
+            production="true"
+          fi
+
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             run_upload="true"
           fi
 
-          if [[ "$GITHUB_EVENT_NAME" == "push" && ( "$GITHUB_REF_NAME" == "main" || "$GITHUB_REF_NAME" == "master" ) ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "push" && ( "$GITHUB_REF_NAME" == "dev" || "$GITHUB_REF_NAME" == "main" || "$GITHUB_REF_NAME" == "master" ) ]]; then
             run_upload="true"
-            production="true"
             dry_run="false"
           fi
 

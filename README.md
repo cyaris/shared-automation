@@ -215,17 +215,19 @@ Optional secret:
 
 Reusable Rollup workflow for Svelte apps that need both shared CI validation and embedded bundle uploads. It resolves
 standard `svelte-lib` refs and additional local dependency refs to exact commit SHAs at run time, runs the shared CI
-workflow first, then runs the shared rollup upload action only for manual dispatches or pushes to `main` or `master`.
+workflow first, then runs the shared rollup upload action only for manual dispatches or pushes to `dev`, `main`, or
+`master`.
 Caller wrappers still own triggers, manual input declarations, S3 destinations, bundle lists, extra dependency refs, and
 caller repository variables.
+Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `test_bundle.*` objects.
 
 Important inputs:
 
 - CI inputs: `working-directory`, `node-version`, `run-format`, `run-lint`, `run-check`, `run-build`, and
   `additional-ci-local-dependency-repositories`
 - Upload inputs: `dist-directory`, `bundle-files`, `s3-bucket`, `s3-prefix`, `aws-region`, `aws-role-to-assume`,
-  `manual-production`, `manual-dry-run`, `sync-dist-extras`, `cache-control`, `metadata-refresh-files`,
-  `svelte-lib-repository`, and `rollup-local-dependency-repositories`
+  `manual-dry-run`, `sync-dist-extras`, `cache-control`, `metadata-refresh-files`, `svelte-lib-repository`, and
+  `rollup-local-dependency-repositories`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
 Rollup callers use branch refs such as `main` for first-party local dependencies by default. The workflow resolves those
