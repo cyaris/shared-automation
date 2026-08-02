@@ -8,8 +8,6 @@ on:
         required: false
         type: string
         default: |
-          .release-please-manifest.json
-          release-please-config.json
           renovate.json
       allowed-dispatch-actor:
         description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
@@ -23,19 +21,17 @@ on:
       - ".github/actions/**"
       - ".github/release-policy.yml"
       - ".github/workflows/**"
-      - ".release-please-manifest.json"
       - "AGENTS.md"
       - "README.md"
-      - "release-please-config.json"
+      - "renovate.json"
   pull_request:
     paths:
       - ".github/actions/**"
       - ".github/release-policy.yml"
       - ".github/workflows/**"
-      - ".release-please-manifest.json"
       - "AGENTS.md"
       - "README.md"
-      - "release-please-config.json"
+      - "renovate.json"
   workflow_dispatch:
 
 permissions:
@@ -95,7 +91,7 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${JSON_FILES:-}" ]]; then
-            JSON_FILES=$'.release-please-manifest.json\nrelease-please-config.json\nrenovate.json'
+            JSON_FILES="renovate.json"
           fi
 
           while IFS= read -r file; do

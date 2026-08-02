@@ -17,10 +17,8 @@
   repository documents an intentional override; the shared Rollup workflow resolves those refs to exact commit SHAs
   during each run before checkout and upload.
 - Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
-- Keep Release Please execution local to each repository by default. Repository-local `release-please.yml`,
-  `release-please-config.json`, and `.release-please-manifest.json` files should own that repository's default branch,
-  historical handoff SHA, manifest version, and future release state; shared rules here should cover conventions rather
-  than hiding that state behind another reusable workflow.
+- Keep release boundary decisions in the shared auto-release workflow and release-policy files. Caller repositories should
+  not add separate release automation unless the user explicitly asks for a repository-specific exception.
 - Do not move a repository-specific workflow implementation into this repository unless another repository will share the same behavior.
 - Manual `workflow_dispatch` paths must remain restricted to the `cyaris` GitHub actor by default.
 
@@ -68,12 +66,10 @@
 - Prefer AWS OIDC for deployment workflows. Caller jobs that pass `aws-role-to-assume` must grant `id-token: write`;
   static AWS access-key secrets may remain only as a compatibility fallback until callers have repository-specific OIDC
   roles configured.
-- Use accurate Conventional Commit subjects for changes that Release Please should classify. Do not inflate routine work
-  into release-triggering types: use types such as `chore:`, `ci:`, `docs:`, `test:`, or `refactor:` for maintenance,
-  and reserve `feat:`, `fix:`, `perf:`, and breaking-change syntax for changes that genuinely match those meanings.
+- Write clear, specific commit subjects that describe the actual change. Prefer plain language over release-tool syntax,
+  and do not exaggerate routine maintenance as user-facing work.
 - Treat upstream automation, shared workflow reference, dependency-pin, Renovate, and release-policy maintenance as
-  non-release work unless it changes repository user behavior or a published package/runtime API. Use `ci:`, `chore:`,
-  or `docs:` for those changes so Release Please does not create downstream version bumps solely from upstream plumbing.
+  non-release work unless it changes repository user behavior or a published package/runtime API.
 - For rollup upload callers, pushes to `main` or `master` should run production uploads. Manual dispatch should keep
   staged uploads as the default unless `production` is explicitly selected.
 - Keep `dev` push triggers only for workflows whose purpose is specifically dev-branch automation, such as
