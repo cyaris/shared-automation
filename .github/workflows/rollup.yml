@@ -46,16 +46,6 @@ on:
         required: false
         type: boolean
         default: false
-      manual-svelte-lib-ref:
-        description: Manual dispatch svelte-lib ref input from the caller wrapper.
-        required: false
-        type: string
-        default: ""
-      svelte-lib-variable-ref:
-        description: Caller repository SVELTE_LIB_REF variable value.
-        required: false
-        type: string
-        default: ""
       sync-dist-extras:
         description: Sync non-bundle files from dist-directory to the S3 prefix.
         required: false
@@ -98,11 +88,6 @@ on:
         default: ""
       rollup-local-dependency-repositories:
         description: Optional newline-separated local dependency specs for the rollup upload job as owner/repo:path:ref.
-        required: false
-        type: string
-        default: ""
-      production-ref-requirements:
-        description: Optional newline-separated production ref requirements as NAME=ref.
         required: false
         type: string
         default: ""
@@ -161,30 +146,80 @@ jobs:
       dry_run: ${{ steps.values.outputs.dry_run }}
       production: ${{ steps.values.outputs.production }}
       run_upload: ${{ steps.values.outputs.run_upload }}
+      rollup_local_dependency_repositories: ${{ steps.values.outputs.rollup_local_dependency_repositories }}
       svelte_lib_ref: ${{ steps.values.outputs.svelte_lib_ref }}
     steps:
       - id: values
         env:
           ADDITIONAL_CI_LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.additional-ci-local-dependency-repositories }}
+          CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN }}
           INPUT_DRY_RUN: ${{ inputs.manual-dry-run }}
           INPUT_PRODUCTION: ${{ inputs.manual-production }}
-          INPUT_SVELTE_LIB_REF: ${{ inputs.manual-svelte-lib-ref }}
-          PRODUCTION_REF_REQUIREMENTS: ${{ inputs.production-ref-requirements }}
+          ROLLUP_LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.rollup-local-dependency-repositories }}
           SVELTE_LIB_REPOSITORY: ${{ inputs.svelte-lib-repository }}
-          VAR_SVELTE_LIB_REF: ${{ inputs.svelte-lib-variable-ref }}
         run: |
           set -euo pipefail
+
+          resolve_github_ref() {
+            local repository="$1"
+            local ref="$2"
+            local label="$3"
+            local auth_header
+            local git_config=()
+            local pattern
+            local resolved
+
+            if [[ "$ref" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              printf "%s\n" "${ref,,}"
+              return
+            fi
+
+            if [[ -n "$CHECKOUT_TOKEN" ]]; then
+              auth_header="$(printf 'x-access-token:%s' "$CHECKOUT_TOKEN" | base64 | tr -d '\n')"
+              git_config=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header")
+            fi
+
+            for pattern in "refs/heads/$ref" "refs/tags/$ref^{}" "refs/tags/$ref" "$ref"; do
+              if resolved="$(git "${git_config[@]}" ls-remote --exit-code "https://github.com/${repository}.git" "$pattern" 2>/dev/null | awk 'NR == 1 { print $1 }')" && [[ -n "$resolved" ]]; then
+                printf "%s\n" "$resolved"
+                return
+              fi
+            done
+
+            printf "Failed to resolve %s ref %s in %s.\n" "$label" "$ref" "$repository" >&2
+            exit 1
+          }
+
+          resolve_local_dependency_repositories() {
+            local specs="$1"
+            local spec
+            local repository
+            local checkout_path
+            local ref
+            local resolved_ref
+
+            while IFS= read -r spec; do
+              if [[ -z "$spec" ]]; then
+                continue
+              fi
+
+              IFS=: read -r repository checkout_path ref <<< "$spec"
+
+              if [[ -z "$repository" || -z "$checkout_path" || -z "$ref" ]]; then
+                printf "Invalid local dependency spec: %s\n" "$spec" >&2
+                exit 1
+              fi
+
+              resolved_ref="$(resolve_github_ref "$repository" "$ref" "$repository")"
+              printf "%s:%s:%s\n" "$repository" "$checkout_path" "$resolved_ref"
+            done <<< "$specs"
+          }
 
           production="$INPUT_PRODUCTION"
           dry_run="$INPUT_DRY_RUN"
           run_upload="false"
           default_svelte_lib_ref="main"
-
-          if [[ "${GITHUB_BASE_REF:-}" == "dev" || "${GITHUB_HEAD_REF:-}" == "dev" || "${GITHUB_REF_NAME:-}" == "dev" ]]; then
-            default_svelte_lib_ref="dev"
-          fi
-
-          svelte_lib_ref="${INPUT_SVELTE_LIB_REF:-${VAR_SVELTE_LIB_REF:-$default_svelte_lib_ref}}"
+          svelte_lib_ref="$default_svelte_lib_ref"
 
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             run_upload="true"
@@ -192,46 +227,25 @@ jobs:
 
           if [[ "$GITHUB_EVENT_NAME" == "push" && ( "$GITHUB_REF_NAME" == "main" || "$GITHUB_REF_NAME" == "master" ) ]]; then
             run_upload="true"
-            svelte_lib_ref="${VAR_SVELTE_LIB_REF:-$default_svelte_lib_ref}"
             production="true"
             dry_run="false"
           fi
 
-          if [[ "$production" == "true" && ! "$svelte_lib_ref" =~ ^[0-9a-f]{40}$ ]]; then
-            printf "Production uploads require SVELTE_LIB_REF or svelte-lib-ref to be a pinned 40-character commit SHA.\n" >&2
-            exit 1
-          fi
-
-          while IFS= read -r spec; do
-            spec="${spec#"${spec%%[![:space:]]*}"}"
-            spec="${spec%"${spec##*[![:space:]]}"}"
-
-            if [[ -z "$spec" ]]; then
-              continue
-            fi
-
-            name="${spec%%=*}"
-            ref="${spec#*=}"
-
-            if [[ -z "$name" || -z "$ref" || "$name" == "$ref" ]]; then
-              printf "Invalid production ref requirement: %s\n" "$spec" >&2
-              exit 1
-            fi
-
-            if [[ "$production" == "true" && ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
-              printf "Production uploads require %s to be a pinned 40-character commit SHA.\n" "$name" >&2
-              exit 1
-            fi
-          done <<< "$PRODUCTION_REF_REQUIREMENTS"
+          svelte_lib_ref="$(resolve_github_ref "$SVELTE_LIB_REPOSITORY" "$svelte_lib_ref" "svelte-lib")"
+          resolved_additional_ci_local_dependency_repositories="$(resolve_local_dependency_repositories "$ADDITIONAL_CI_LOCAL_DEPENDENCY_REPOSITORIES")"
+          resolved_rollup_local_dependency_repositories="$(resolve_local_dependency_repositories "$ROLLUP_LOCAL_DEPENDENCY_REPOSITORIES")"
 
           {
             printf "ci_local_dependency_repositories<<ROLLUP_CI_DEPS\n"
             printf "%s:svelte-lib:%s\n" "$SVELTE_LIB_REPOSITORY" "$svelte_lib_ref"
-            printf "%s\n" "$ADDITIONAL_CI_LOCAL_DEPENDENCY_REPOSITORIES"
+            printf "%s\n" "$resolved_additional_ci_local_dependency_repositories"
             printf "ROLLUP_CI_DEPS\n"
             printf "dry_run=%s\n" "$dry_run"
             printf "production=%s\n" "$production"
             printf "run_upload=%s\n" "$run_upload"
+            printf "rollup_local_dependency_repositories<<ROLLUP_UPLOAD_DEPS\n"
+            printf "%s\n" "$resolved_rollup_local_dependency_repositories"
+            printf "ROLLUP_UPLOAD_DEPS\n"
             printf "svelte_lib_ref=%s\n" "$svelte_lib_ref"
           } >> "$GITHUB_OUTPUT"
 
@@ -316,4 +330,4 @@ jobs:
           node-version: ${{ inputs.node-version }}
           svelte-lib-directory: svelte-lib
           checkout-token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
-          local-dependency-repositories: ${{ inputs.rollup-local-dependency-repositories }}
+          local-dependency-repositories: ${{ needs.resolve-inputs.outputs.rollup_local_dependency_repositories }}
