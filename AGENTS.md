@@ -12,6 +12,10 @@
 - Keep composite GitHub Actions in `.github/actions`.
 - Keep shared CI, rollup, auto-create-dev-PR, and auto-release implementation changes in this repository. Caller repositories should keep thin local wrapper workflows that define triggers, permissions, inputs, secrets, and repository-specific values before calling the reusable workflow here.
 - Keep reusable workflow defaults general. Caller-specific commands, local dependency refs, bundle file lists, metadata refresh files, branch selections, S3 prefixes, and release naming or milestone overrides belong in caller workflow inputs or caller release-policy files.
+- First-party upstream refs should track the latest production branch by default. Reusable workflow callers may use
+  `cyaris/shared-automation` refs on `main`. Rollup local dependencies should use branch refs such as `main` unless a
+  repository documents an intentional override; the shared Rollup workflow resolves those refs to exact commit SHAs
+  during each run before checkout and upload.
 - Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
 - Keep Release Please execution local to each repository by default. Repository-local `release-please.yml`,
   `release-please-config.json`, and `.release-please-manifest.json` files should own that repository's default branch,
@@ -69,6 +73,9 @@
   or `docs:` for those changes so Release Please does not create downstream version bumps solely from upstream plumbing.
 - For rollup upload callers, pushes to `main` or `master` should run production uploads. Manual dispatch should keep
   staged uploads as the default unless `production` is explicitly selected.
+- Keep `dev` push triggers only for workflows whose purpose is specifically dev-branch automation, such as
+  `auto-create-dev-pr`. CI, build, Rollup, Pages, and workflow-validation jobs should rely on pull-request checks for
+  dev-to-production changes and production-branch push checks after merge unless a repository documents a specific need.
 
 ## Dependency Automation
 
@@ -96,5 +103,5 @@
 - Treat `actionlint` failures as workflow contract or syntax issues to fix before rollout.
 - Treat `zizmor` findings as security-review prompts. Fix true positives, document accepted risks, and avoid broad
   suppressions.
-- Keep third-party GitHub Actions hash-pinned when `zizmor` requires it, but do not force downstream
-  `cyaris/shared-automation` reusable workflow callers to use raw commit SHAs before an approved stable major tag exists.
+- Keep third-party GitHub Actions hash-pinned when `zizmor` requires it. First-party reusable workflow callers may use
+  `cyaris/shared-automation` refs on `main` so callers pick up the latest shared workflow implementation.

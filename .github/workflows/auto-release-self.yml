@@ -13,11 +13,6 @@ on:
         required: false
         type: string
         default: ""
-      shared-automation-ref:
-        description: shared-automation ref used to read the shared release policy.
-        required: false
-        type: string
-        default: ""
       publish:
         description: Apply selected release creates and updates. Keep false to report the plan only.
         required: false
@@ -44,7 +39,6 @@ jobs:
     with:
       pr-number: ${{ github.event.inputs['pr-number'] }}
       release-sha: ${{ github.event.inputs['release-sha'] }}
-      shared-automation-ref: ${{ github.event.inputs['shared-automation-ref'] }}
       publish: ${{ github.event.inputs.publish == 'true' }}
       update-existing: ${{ github.event.inputs['update-existing'] != 'false' }}
       review-artifact-retention-days: ${{ fromJSON(github.event.inputs['review-artifact-retention-days'] || '30') }}

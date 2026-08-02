@@ -30,10 +30,9 @@ The shared preset covers:
 - generated and vendored path exclusions for `node_modules`, `_site`, `.svelte-kit`, `dist`, and `build`
 
 Third-party GitHub Actions should use hash pins with readable major-version comments, then rely on Renovate for future
-updates. Reusable workflow callers may keep `cyaris/shared-automation` refs on `main` until a stable shared workflow tag
-such as `v1` is created and selected for rollout. Repository-specific action families, such as GitHub Pages actions in
-`cyaris.github.io`, may stay on their own supported major versions when they do not overlap with shared workflow
-implementation actions.
+updates. First-party reusable workflow callers keep `cyaris/shared-automation` refs on `main` so each run uses the latest
+shared workflow implementation. Repository-specific action families, such as GitHub Pages actions in `cyaris.github.io`,
+may stay on their own supported major versions when they do not overlap with shared workflow implementation actions.
 
 Renovate automerge is not enabled. Dependency updates should arrive as reviewable pull requests unless a repository
 adds an explicit local automerge policy later.
@@ -45,7 +44,7 @@ the app must be allowed to read both the target repository and this preset repos
 ## Branch Model
 
 Use `main` for stable reusable workflow definitions and `dev` for proposed changes. Dependent repositories should call
-`@main` until an approved stable major tag exists. Do not update callers to `@v1` before that tag exists.
+`@main` so they use the latest stable shared workflow commit at run time.
 
 Future stable references should use this model:
 
@@ -189,6 +188,8 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -197,7 +198,7 @@ jobs:
     uses: cyaris/shared-automation/.github/workflows/ci.yml@main
     with:
       local-dependency-repositories: |
-        cyaris/svelte-lib:svelte-lib:${{ vars.SVELTE_LIB_REF || 'main' }}
+        cyaris/svelte-lib:svelte-lib:main
     secrets:
       CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -220,9 +221,10 @@ Optional secret:
 ### `.github/workflows/rollup.yml`
 
 Reusable Rollup workflow for Svelte apps that need both shared CI validation and embedded bundle uploads. It resolves
-standard `svelte-lib` refs, runs the shared CI workflow first, then runs the shared rollup upload action only for manual
-dispatches or pushes to `main` or `master`. Caller wrappers still own triggers, manual input declarations, S3
-destinations, bundle lists, extra dependency refs, and caller repository variables.
+standard `svelte-lib` refs and additional local dependency refs to exact commit SHAs at run time, runs the shared CI
+workflow first, then runs the shared rollup upload action only for manual dispatches or pushes to `main` or `master`.
+Caller wrappers still own triggers, manual input declarations, S3 destinations, bundle lists, extra dependency refs, and
+caller repository variables.
 
 Important inputs:
 
@@ -230,10 +232,12 @@ Important inputs:
   `additional-ci-local-dependency-repositories`
 - Upload inputs: `dist-directory`, `bundle-files`, `s3-bucket`, `s3-prefix`, `aws-region`, `aws-role-to-assume`,
   `manual-production`, `manual-dry-run`, `sync-dist-extras`, `cache-control`, `metadata-refresh-files`,
-  `svelte-lib-repository`, `manual-svelte-lib-ref`, `svelte-lib-variable-ref`, and
-  `rollup-local-dependency-repositories`
-- `production-ref-requirements` as `NAME=ref` lines for additional local dependencies that must be pinned in production
+  `svelte-lib-repository`, and `rollup-local-dependency-repositories`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
+
+Rollup callers use branch refs such as `main` for first-party local dependencies by default. The workflow resolves those
+refs to the latest commit SHA before checking out dependencies, so production uploads use current upstream code while
+preserving exact commit evidence in the run.
 
 The composite upload implementation lives at `.github/actions/rollup-upload/action.yml`. AWS OIDC is the preferred
 authentication path. Rollup caller repositories should store the role ARN in a repository variable such as
@@ -264,7 +268,6 @@ name: Workflow validation
 on:
   push:
     branches:
-      - dev
       - main
     paths:
       - ".github/release-policy.yml"
