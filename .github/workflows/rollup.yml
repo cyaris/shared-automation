@@ -76,13 +76,8 @@ on:
         required: false
         type: string
         default: cyaris/svelte-lib
-      additional-ci-local-dependency-repositories:
-        description: Optional newline-separated local dependency specs to add after svelte-lib in the CI job.
-        required: false
-        type: string
-        default: ""
-      rollup-local-dependency-repositories:
-        description: Optional newline-separated local dependency specs for the rollup upload job as owner/repo:path:ref.
+      local-dependency-repositories:
+        description: Optional newline-separated local dependency specs used by both CI and rollup upload as owner/repo:path:ref.
         required: false
         type: string
         default: ""
@@ -145,10 +140,9 @@ jobs:
     steps:
       - id: values
         env:
-          ADDITIONAL_CI_LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.additional-ci-local-dependency-repositories }}
           CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN }}
           INPUT_DRY_RUN: ${{ inputs.manual-dry-run }}
-          ROLLUP_LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.rollup-local-dependency-repositories }}
+          LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.local-dependency-repositories }}
           SVELTE_LIB_REPOSITORY: ${{ inputs.svelte-lib-repository }}
         run: |
           set -euo pipefail
@@ -244,19 +238,18 @@ jobs:
           fi
 
           svelte_lib_ref="$(resolve_github_ref "$SVELTE_LIB_REPOSITORY" "$svelte_lib_ref" "svelte-lib")"
-          resolved_additional_ci_local_dependency_repositories="$(resolve_local_dependency_repositories "$ADDITIONAL_CI_LOCAL_DEPENDENCY_REPOSITORIES")"
-          resolved_rollup_local_dependency_repositories="$(resolve_local_dependency_repositories "$ROLLUP_LOCAL_DEPENDENCY_REPOSITORIES")"
+          resolved_local_dependency_repositories="$(resolve_local_dependency_repositories "$LOCAL_DEPENDENCY_REPOSITORIES")"
 
           {
             printf "ci_local_dependency_repositories<<ROLLUP_CI_DEPS\n"
             printf "%s:svelte-lib:%s\n" "$SVELTE_LIB_REPOSITORY" "$svelte_lib_ref"
-            printf "%s\n" "$resolved_additional_ci_local_dependency_repositories"
+            printf "%s\n" "$resolved_local_dependency_repositories"
             printf "ROLLUP_CI_DEPS\n"
             printf "dry_run=%s\n" "$dry_run"
             printf "production=%s\n" "$production"
             printf "run_upload=%s\n" "$run_upload"
             printf "rollup_local_dependency_repositories<<ROLLUP_UPLOAD_DEPS\n"
-            printf "%s\n" "$resolved_rollup_local_dependency_repositories"
+            printf "%s\n" "$resolved_local_dependency_repositories"
             printf "ROLLUP_UPLOAD_DEPS\n"
             printf "svelte_lib_ref=%s\n" "$svelte_lib_ref"
           } >> "$GITHUB_OUTPUT"

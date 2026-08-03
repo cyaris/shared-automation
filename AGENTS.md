@@ -14,8 +14,9 @@
 - Keep reusable workflow defaults general. Caller-specific commands, local dependency refs, bundle file lists, metadata refresh files, branch selections, S3 prefixes, and release naming or milestone overrides belong in caller workflow inputs or caller release-policy files.
 - First-party upstream refs should track the latest production branch by default. Reusable workflow callers may use
   `cyaris/shared-automation` refs on `main`. Rollup local dependencies should use branch refs such as `main` unless a
-  repository documents an intentional override; the shared Rollup workflow resolves those refs to exact commit SHAs
-  during each run before checkout and upload.
+  repository documents an intentional override; dependencies needed by both CI and upload should be listed in
+  `local-dependency-repositories`, and the shared Rollup workflow resolves those refs to exact commit SHAs during each
+  run before checkout and upload.
 - Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
 - Keep release boundary decisions in the shared auto-release workflow and release-policy files. Caller repositories should
   not add separate release automation unless the user explicitly asks for a repository-specific exception.
