@@ -219,6 +219,8 @@ then runs the shared rollup upload action only for manual dispatches or pushes t
 Caller wrappers still own triggers, manual input declarations, S3 destinations, bundle lists, extra dependency refs, and
 caller repository variables.
 Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `test_bundle.*` objects.
+This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
+local wrapper workflow instead.
 
 Important inputs:
 

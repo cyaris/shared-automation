@@ -469,10 +469,10 @@ jobs:
                 if (!release) {
                   throw new Error(`Update action targets a missing release tag: ${action.tag}`)
                 }
-                if (!commitShas.has(action.target_sha)) {
-                  throw new Error(`Release target is outside the reconciled commit window for update action ${action.tag}: ${action.target_sha}`)
+                if (!release.targetSha) {
+                  throw new Error(`Could not resolve the existing release target for update action ${action.tag}`)
                 }
-                if (release.targetSha && release.targetSha !== action.target_sha) {
+                if (release.targetSha !== action.target_sha) {
                   throw new Error(`Update action cannot move ${action.tag} from ${release.targetSha} to ${action.target_sha}`)
                 }
               } else {
