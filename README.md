@@ -232,8 +232,9 @@ Important inputs:
 
 Rollup callers use branch refs such as `main` for first-party local dependencies by default. The workflow resolves those
 refs once to the latest commit SHA before checking out dependencies. Dependencies listed in
-`local-dependency-repositories` are passed to both CI and upload with the same resolved SHA, so production uploads use
-current upstream code while preserving exact commit evidence in the run.
+`local-dependency-repositories` use `owner/repo:path:ref` entries, such as `cyaris/fireworks:fireworks:main`. Those
+dependencies are passed to both CI and upload with the same resolved SHA, so production uploads use current upstream code
+while preserving exact commit evidence in the run.
 
 The composite upload implementation lives at `.github/actions/rollup-upload/action.yml`. AWS OIDC is the preferred
 authentication path. Rollup caller repositories should store the role ARN in a repository variable such as
