@@ -14,8 +14,9 @@
 - Keep reusable workflow defaults general. Caller-specific commands, local dependency refs, bundle file lists, metadata refresh files, branch selections, S3 prefixes, and release naming or milestone overrides belong in caller workflow inputs or caller release-policy files.
 - First-party upstream refs should track the latest production branch by default. Reusable workflow callers may use
   `cyaris/shared-automation` refs on `main`. Rollup local dependencies should use branch refs such as `main` unless a
-  repository documents an intentional override; the shared Rollup workflow resolves those refs to exact commit SHAs
-  during each run before checkout and upload.
+  repository documents an intentional override; dependencies needed by both CI and upload should be listed in
+  `local-dependency-repositories`, and the shared Rollup workflow resolves those refs to exact commit SHAs during each
+  run before checkout and upload.
 - Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
 - Keep release boundary decisions in the shared auto-release workflow and release-policy files. Caller repositories should
   not add separate release automation unless the user explicitly asks for a repository-specific exception.
@@ -33,6 +34,8 @@
 - Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
 - Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
 - Keep private action and dependency access requirements documented in `README.md`.
+- Keep README Markdown tables compact in source. Do not pad table cells or separator rows solely to align columns;
+  preserve only required alignment markers such as `---:`, `:---`, or `:---:`.
 - Downstream README files should link to this repository's workflow descriptions instead of repeating shared behavior.
   Keep repo-specific details downstream, such as trigger branches, working directories, S3 prefixes, bundle file lists,
   dependency refs, skipped commands, and required repository variables or secrets.
@@ -63,6 +66,13 @@
   permissions, or paid services that are not configured. Apply this to dry-run modes too: a dry run may avoid external
   writes, but it should still prove that required credentials exist unless the feature is explicitly documented as
   credential-optional.
+- Do not hide required workflow failures with `continue-on-error: true`, `|| true`, warning-only error handlers,
+  harmless default outputs, or skipped jobs. Intentional no-op paths are fine when the work is genuinely unnecessary,
+  such as no release action being needed or no dev pull request being possible, but missing configuration and failed
+  required operations should end in a failed step or job with enough context to debug the cause.
+- Keep scheduled workflows simple. Prefer one schedule away from the top of the hour over multiple UTC schedules plus a
+  local-time gate, unless the repository truly needs exact local-time behavior. If a schedule is only approximate, let
+  the job run and document the chosen UTC time instead of creating helper jobs that make expected runs appear skipped.
 - Prefer AWS OIDC for deployment workflows. Caller jobs that pass `aws-role-to-assume` must grant `id-token: write`;
   static AWS access-key secrets may remain only as a compatibility fallback until callers have repository-specific OIDC
   roles configured.
@@ -70,10 +80,10 @@
   and do not exaggerate routine maintenance as user-facing work.
 - Treat upstream automation, shared workflow reference, dependency-pin, Renovate, and release-policy maintenance as
   non-release work unless it changes repository user behavior or a published package/runtime API.
-- For rollup upload callers, pushes to `main` or `master` should run production uploads. Manual dispatch should keep
-  staged uploads as the default unless `production` is explicitly selected.
-- Keep `dev` push triggers only for workflows whose purpose is specifically dev-branch automation, such as
-  `auto-create-dev-pr`. CI, build, Rollup, Pages, and workflow-validation jobs should rely on pull-request checks for
+- For rollup upload callers, pushes or manual dispatches from `main` or `master` should run production uploads with
+  unprefixed bundle names. Pushes or manual dispatches from `dev` should run staged uploads with `test_bundle.*` names.
+- Keep non-Rollup `dev` push triggers only for workflows whose purpose is specifically dev-branch automation, such as
+  `auto-create-dev-pr`. CI, build, Pages, and workflow-validation jobs should rely on pull-request checks for
   dev-to-production changes and production-branch push checks after merge unless a repository documents a specific need.
 
 ## Dependency Automation

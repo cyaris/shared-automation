@@ -64,6 +64,8 @@ jobs:
         env:
           ALLOWED_DISPATCH_ACTOR: ${{ inputs['allowed-dispatch-actor'] }}
         run: |
+          set -euo pipefail
+
           printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
           exit 1
 

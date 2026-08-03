@@ -44,7 +44,7 @@ inputs:
     required: false
     default: ""
   production:
-    description: Upload bundle.* names instead of staged test_bundle.* names.
+    description: Upload with production bundle names.
     required: false
     default: "false"
   dry-run:
@@ -129,6 +129,8 @@ runs:
       working-directory: ${{ inputs.svelte-lib-directory }}
       shell: bash
       run: |
+        set -euo pipefail
+
         npm ci
         npm run build
 

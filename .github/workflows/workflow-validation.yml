@@ -47,6 +47,8 @@ jobs:
         env:
           ALLOWED_DISPATCH_ACTOR: ${{ inputs['allowed-dispatch-actor'] || 'cyaris' }}
         run: |
+          set -euo pipefail
+
           if [[ "$GITHUB_ACTOR" != "$ALLOWED_DISPATCH_ACTOR" ]]; then
             printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
             exit 1
@@ -122,6 +124,8 @@ jobs:
 
       - name: Install zizmor
         run: |
+          set -euo pipefail
+
           python3 -m pip install --user zizmor==1.28.0
           printf "%s/.local/bin\n" "$HOME" >> "$GITHUB_PATH"
 
@@ -129,6 +133,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+
           cat > "$RUNNER_TEMP/zizmor.yml" <<'EOF'
           rules:
             unpinned-uses:

@@ -96,6 +96,8 @@ jobs:
         env:
           ALLOWED_DISPATCH_ACTOR: ${{ inputs['allowed-dispatch-actor'] }}
         run: |
+          set -euo pipefail
+
           printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
           exit 1
 
@@ -173,7 +175,7 @@ jobs:
             fi
           fi
 
-          if ! git cat-file -e "${release_sha}^{commit}" 2>/dev/null; then
+          if ! git cat-file -e "${release_sha}^{commit}"; then
             if ! git_fetch_origin --force origin "$release_sha"; then
               printf "Failed to fetch release_sha %s from %s.\n" "$release_sha" "$GITHUB_REPOSITORY" >&2
               exit 1
@@ -455,34 +457,23 @@ jobs:
                   continue
                 }
                 if (!tagPattern.test(action.tag) || action.tag.includes("..")) {
-                  action.action = "skip"
-                  action.reason = `Invalid existing release tag. ${action.reason}`.trim()
-                  continue
+                  throw new Error(`Invalid existing release tag for update action: ${action.tag}`)
                 }
                 if (!action.title) {
-                  action.action = "skip"
-                  action.reason = `Release title cannot be empty. ${action.reason}`.trim()
-                  continue
+                  throw new Error(`Release title cannot be empty for update action ${action.tag}`)
                 }
                 if (!action.notes) {
-                  action.action = "skip"
-                  action.reason = `Release notes cannot be empty. ${action.reason}`.trim()
-                  continue
+                  throw new Error(`Release notes cannot be empty for update action ${action.tag}`)
                 }
                 const release = context.existingReleases.find((item) => item.tag === action.tag)
                 if (!release) {
-                  action.action = "skip"
-                  action.reason = `Update action targets a missing release tag. ${action.reason}`.trim()
-                  continue
+                  throw new Error(`Update action targets a missing release tag: ${action.tag}`)
                 }
-                if (!commitShas.has(action.target_sha)) {
-                  action.action = "skip"
-                  action.reason = `Release target is outside the reconciled commit window. ${action.reason}`.trim()
-                  continue
+                if (!release.targetSha) {
+                  throw new Error(`Could not resolve the existing release target for update action ${action.tag}`)
                 }
-                if (release.targetSha && release.targetSha !== action.target_sha) {
-                  action.action = "skip"
-                  action.reason = `Update action cannot move ${action.tag} from ${release.targetSha} to ${action.target_sha}. ${action.reason}`.trim()
+                if (release.targetSha !== action.target_sha) {
+                  throw new Error(`Update action cannot move ${action.tag} from ${release.targetSha} to ${action.target_sha}`)
                 }
               } else {
                 throw new Error(`Unsupported release action: ${action.action}`)
@@ -717,8 +708,8 @@ jobs:
 
           if [[ -n "$PR_NUMBER" ]]; then
             if [[ -f ../release-apply-results.json ]]; then
-              gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. Applied ${applied_count} actions with ${failed_count} failures. ${SUMMARY}" || true
+              gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. Applied ${applied_count} actions with ${failed_count} failures. ${SUMMARY}"
             else
-              gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. ${SUMMARY}" || true
+              gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. ${SUMMARY}"
             fi
           fi
