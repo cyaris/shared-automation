@@ -65,6 +65,13 @@
   permissions, or paid services that are not configured. Apply this to dry-run modes too: a dry run may avoid external
   writes, but it should still prove that required credentials exist unless the feature is explicitly documented as
   credential-optional.
+- Do not hide required workflow failures with `continue-on-error: true`, `|| true`, warning-only error handlers,
+  harmless default outputs, or skipped jobs. Intentional no-op paths are fine when the work is genuinely unnecessary,
+  such as no release action being needed or no dev pull request being possible, but missing configuration and failed
+  required operations should end in a failed step or job with enough context to debug the cause.
+- Keep scheduled workflows simple. Prefer one schedule away from the top of the hour over multiple UTC schedules plus a
+  local-time gate, unless the repository truly needs exact local-time behavior. If a schedule is only approximate, let
+  the job run and document the chosen UTC time instead of creating helper jobs that make expected runs appear skipped.
 - Prefer AWS OIDC for deployment workflows. Caller jobs that pass `aws-role-to-assume` must grant `id-token: write`;
   static AWS access-key secrets may remain only as a compatibility fallback until callers have repository-specific OIDC
   roles configured.
