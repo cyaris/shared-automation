@@ -32,6 +32,8 @@ release_notes:
     - speculative claims
     - internal-only implementation detail unless it affects users or maintainers
 
+# This automation block is advisory context passed to the release-planning model. It does not control workflow
+# behavior; the auto-release workflow's `publish` input is the only setting that enables applying release changes.
 automation:
   publish: false
   release_status: full
