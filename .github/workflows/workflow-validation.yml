@@ -74,6 +74,8 @@ jobs:
 
       - name: Run actionlint
         run: |
+          set -euo pipefail
+
           "$HOME/go/bin/actionlint" -color
 
   json-config:
