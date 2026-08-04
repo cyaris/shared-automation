@@ -278,6 +278,9 @@ jobs:
       - node-package-ci
       - resolve-inputs
     if: needs.resolve-inputs.outputs.run_upload == 'true'
+    concurrency:
+      group: rollup-upload-${{ github.repository }}-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
