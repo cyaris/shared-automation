@@ -28,6 +28,8 @@ The shared preset covers:
 - grouped minor and patch npm updates for production and development dependencies
 - grouped GitHub Actions updates, including `cyaris/shared-automation` workflow references
 - generated and vendored path exclusions for `node_modules`, `_site`, `.svelte-kit`, `dist`, and `build`
+- the `actionlint` and `zizmor` versions pinned in `.github/workflows/workflow-validation.yml`, tracked through custom
+  regex managers since those tools are installed by shell commands rather than a package manifest
 
 Third-party GitHub Actions should use hash pins with readable major-version comments, then rely on Renovate for future
 updates. First-party reusable workflow callers keep `cyaris/shared-automation` refs on `main` so each run uses the latest

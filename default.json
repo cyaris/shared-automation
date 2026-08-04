@@ -48,5 +48,21 @@
       "groupSlug": "npm-dev-minor-patch",
       "labels": ["dependencies", "npm"]
     }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/workflow-validation\\.yml$/"],
+      "matchStrings": ["go install github\\.com/rhysd/actionlint/cmd/actionlint@(?<currentValue>v[0-9.]+)"],
+      "depNameTemplate": "rhysd/actionlint",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/workflow-validation\\.yml$/"],
+      "matchStrings": ["zizmor==(?<currentValue>[0-9.]+)"],
+      "depNameTemplate": "zizmor",
+      "datasourceTemplate": "pypi"
+    }
   ]
 }
