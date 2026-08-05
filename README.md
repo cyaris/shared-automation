@@ -14,6 +14,13 @@ Reusable workflow and composite-action contracts use structured inputs such as b
 validated spec lines. They avoid caller-provided shell command strings unless a documented repository need cannot be
 expressed through fixed package scripts or structured configuration.
 
+## Node Tooling
+
+The root `package.json` covers the Node scripts under `.github/scripts/` that back `.github/workflows/auto-release.yml`.
+`npm run format`, `npm run format:check`, `npm run lint`, and `npm test` apply Prettier, ESLint, and `node --test`
+to those files; `.prettierrc.cjs` and `eslint.config.mjs` hold the formatting and lint rules. `.github/workflows/ci-self.yml`
+runs `npm run format:check`, `npm run lint`, and `npm test` on changes to that package.
+
 ## Renovate
 
 Renovate dependency automation is prepared through the shared preset in `default.json`. Participating repositories keep
@@ -120,6 +127,10 @@ history through a selected commit, combines the shared release policy in this re
 overrides, asks the configured OpenAI model which existing releases should be updated and which missing release
 milestones should be created, and can apply those changes when explicitly enabled.
 
+The context-gathering, planning, and apply logic live in `.github/scripts/gather-release-context.js`,
+`plan-release-reconciliation.js`, and `apply-release-reconciliation.js`, each covered by `node --test` unit tests run
+through `.github/workflows/ci-self.yml`.
+
 Typical caller wrapper:
 
 ```yaml
@@ -170,11 +181,19 @@ create/update/skip actions, then respond by updating release policy or rerunning
 does not support editing propositions inside the running planning step; publication should be a later explicit run after
 the reviewed plan is approved.
 
+### `.github/workflows/ci-self.yml`
+
+Local workflow for this repository's own `.github/scripts` package. It runs on pushes to `main` and pull requests that
+touch `.github/scripts/**`, `package.json`, `package-lock.json`, `eslint.config.mjs`, or `.prettierrc.cjs`, plus manual
+dispatch, then delegates to `.github/workflows/ci.yml` with formatting, linting, and `npm test` enabled. `run-check` and
+`run-build` are disabled since this repository has no type check or build step.
+
 ### `.github/workflows/ci.yml`
 
 Reusable Node package validation workflow. It checks out the caller repository, optionally checks out and builds
 local `file:` dependency repositories, runs `npm ci`, then runs the fixed `npm run format:check`, `npm run lint`,
-`npm run check`, and `npm run build` scripts unless the matching `run-*` flag disables that step.
+`npm run check`, `npm test`, and `npm run build` scripts unless the matching `run-*` flag disables that step. `run-test`
+defaults to `false` since not every caller declares a `test` script.
 
 Typical caller wrapper:
 
@@ -203,6 +222,7 @@ Important inputs:
 
 - `working-directory` and `node-version`
 - `run-format`, `run-lint`, `run-check`, and `run-build`; set a flag to `false` to skip that standard npm script
+- `run-test` to run `npm test`, defaulting to `false`
 - optional `local-dependency-repositories` entries as `owner/repo:path:ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 

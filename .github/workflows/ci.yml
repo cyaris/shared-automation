@@ -38,6 +38,11 @@ on:
         required: false
         type: boolean
         default: true
+      run-test:
+        description: Run npm test.
+        required: false
+        type: boolean
+        default: false
       allowed-dispatch-actor:
         description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
         required: false
@@ -168,6 +173,11 @@ jobs:
         if: inputs.run-check
         working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
         run: npm run check
+
+      - name: Run tests
+        if: inputs.run-test
+        working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
+        run: npm test
 
       - name: Build
         if: inputs.run-build

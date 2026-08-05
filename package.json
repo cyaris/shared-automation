@@ -1,0 +1,19 @@
+{
+  "name": "shared-automation",
+  "private": true,
+  "scripts": {
+    "format": "prettier --ignore-path .gitignore --write '**/*.{cjs,js,json,mjs}'",
+    "format:check": "prettier --ignore-path .gitignore --check '**/*.{cjs,js,json,mjs}'",
+    "lint": "eslint '**/*.{cjs,js,mjs}'",
+    "test": "node --test .github/scripts/**/*.test.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-simple-import-sort": "^13.0.0",
+    "globals": "^17.9.0",
+    "prettier": "^3.9.6"
+  }
+}

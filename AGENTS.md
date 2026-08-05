@@ -114,3 +114,6 @@
   suppressions.
 - Keep third-party GitHub Actions hash-pinned when `zizmor` requires it. First-party reusable workflow callers may use
   `cyaris/shared-automation` refs on `main` so callers pick up the latest shared workflow implementation.
+- Extract non-trivial inline Node.js logic out of `run:` heredocs into standalone files under `.github/scripts/`,
+  covered by `node --test`, rather than leaving security-relevant or otherwise complex logic untested inside a workflow
+  step. Wire the reusable CI workflow's `run-test` input to run those tests before rollout.

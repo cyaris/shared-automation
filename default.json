@@ -14,10 +14,7 @@
   "minimumReleaseAge": "3 days",
   "labels": ["dependencies"],
   "ignorePaths": ["**/node_modules/**", "**/_site/**", "**/.svelte-kit/**", "**/dist/**", "**/build/**"],
-  "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": ["before 6am on monday"]
-  },
+  "lockFileMaintenance": { "enabled": true, "schedule": ["before 6am on monday"] },
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
