@@ -2,6 +2,7 @@
 
 const crypto = require("crypto")
 const fs = require("fs")
+const path = require("path")
 
 const TAG_PATTERN = /^v[0-9]+(\.[0-9]+){0,2}([._-][A-Za-z0-9]+)?$/
 
@@ -158,11 +159,13 @@ function buildSummaryDelimiter(summary) {
 }
 
 async function main() {
-  const context = JSON.parse(fs.readFileSync("release-context.json", "utf8"))
+  const artifactDir = process.env.RELEASE_ARTIFACT_DIR
+  const context = JSON.parse(fs.readFileSync(path.join(artifactDir, "release-context.json"), "utf8"))
   const body = buildRequestBody({ context, model: process.env.OPENAI_MODEL })
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 120000)
+  let responseText
   let response
 
   try {
@@ -172,13 +175,13 @@ async function main() {
       body: JSON.stringify(body),
       signal: controller.signal
     })
+    responseText = await response.text()
   } catch (error) {
     throw new Error(`OpenAI API request could not be completed: ${error.message}`)
   } finally {
     clearTimeout(timeout)
   }
 
-  const responseText = await response.text()
   let data
 
   try {
@@ -204,7 +207,7 @@ async function main() {
   plan.summary = String(plan.summary || "").trim()
   plan.actions = validateActions(normalizeActions(plan.actions), context)
 
-  fs.writeFileSync("release-plan.json", JSON.stringify(plan, null, 2))
+  fs.writeFileSync(path.join(artifactDir, "release-plan.json"), JSON.stringify(plan, null, 2))
 
   const createCount = plan.actions.filter(action => action.action === "create").length
   const updateCount = plan.actions.filter(action => action.action === "update").length

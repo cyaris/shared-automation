@@ -88,6 +88,7 @@ jobs:
 
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+      RELEASE_ARTIFACT_DIR: ${{ github.workspace }}
 
     steps:
       - name: Validate manual dispatcher
@@ -188,9 +189,10 @@ jobs:
             fi
           fi
 
-          git log --reverse --date=short --format="%H%x09%h%x09%ad%x09%s" "$release_sha" -- > ../commits.tsv
-          git ls-tree -r --name-only "$release_sha" > ../files.txt
-          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate --slurp > ../existing-releases.raw.json
+          git log --reverse --date=short --format="%H%x09%h%x09%ad%x09%s" "$release_sha" -- > "$RELEASE_ARTIFACT_DIR/commits.tsv"
+          git ls-tree -r --name-only "$release_sha" > "$RELEASE_ARTIFACT_DIR/files.txt"
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate --slurp \
+            > "$RELEASE_ARTIFACT_DIR/existing-releases.raw.json"
 
           export DEFAULT_BRANCH="$default_branch"
           export RELEASE_SHA="$release_sha"
@@ -217,67 +219,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          node <<'NODE'
-          const fs = require("fs")
-          const context = JSON.parse(fs.readFileSync("../release-context.json", "utf8"))
-          const plan = JSON.parse(fs.readFileSync("../release-plan.json", "utf8"))
-          const escapeCell = (value) => String(value || "").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>")
-          const shortSha = (value) => String(value || "").slice(0, 12)
-          const counts = plan.actions.reduce((acc, action) => {
-            acc[action.action] = (acc[action.action] || 0) + 1
-            return acc
-          }, {})
-
-          const lines = [
-            `# Release Reconciliation Review: ${context.repository}`,
-            "",
-            `- Target commit: \`${context.releaseSha}\``,
-            `- Default branch: \`${context.defaultBranch || "unknown"}\``,
-            `- Existing releases: ${context.existingReleases.length}`,
-            `- Commits considered: ${context.commits.length} of ${context.commitCount}`,
-            `- Omitted commits: ${context.omittedCommitCount}`,
-            `- Changed files listed: ${context.changedFilesAtReleaseSha.length}`,
-            `- Omitted files: ${context.omittedFileCount}`,
-            `- Update existing releases: ${context.updateExisting}`,
-            "",
-            "## Plan Counts",
-            "",
-            `- Create: ${counts.create || 0}`,
-            `- Update: ${counts.update || 0}`,
-            `- Skip: ${counts.skip || 0}`,
-            "",
-            "## Summary",
-            "",
-            process.env.SUMMARY || plan.summary || "",
-            "",
-            "## Proposed Actions",
-            "",
-            "| Action | Tag | Target | Title | Reason |",
-            "| --- | --- | --- | --- | --- |"
-          ]
-
-          for (const action of plan.actions) {
-            lines.push(`| ${escapeCell(action.action)} | ${escapeCell(action.tag)} | \`${shortSha(action.target_sha)}\` | ${escapeCell(action.title)} | ${escapeCell(action.reason)} |`)
-          }
-
-          if (!plan.actions.length) {
-            lines.push("| skip |  |  | No actions proposed | No release actions were proposed |")
-          }
-
-          lines.push(
-            "",
-            "## Review Files",
-            "",
-            "- `release-plan.json` contains the normalized create/update/skip proposal.",
-            "- `release-context.json` contains the bounded repository context sent for planning.",
-            "- `existing-releases.raw.json`, `commits.tsv`, and `files.txt` contain source inventory data.",
-            "",
-            "Publication is controlled separately by `publish`; report-only runs do not create tags or releases."
-          )
-
-          fs.writeFileSync("../release-review-summary.md", `${lines.join("\n")}\n`)
-          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`)
-          NODE
+          node ../shared-automation/.github/scripts/build-release-summary.js
 
       - name: Upload review artifacts
         if: always() && steps.plan.outcome == 'success'
@@ -343,11 +285,13 @@ jobs:
           printf "Release reconciliation planned %s creates and %s updates.\n" "$CREATE_COUNT" "$UPDATE_COUNT"
           printf "%s\n" "$SUMMARY"
 
+          apply_results_file="$RELEASE_ARTIFACT_DIR/release-apply-results.json"
+
           applied_count="0"
           failed_count="0"
-          if [[ -f ../release-apply-results.json ]]; then
-            applied_count="$(node -e 'const fs=require("fs"); const data=JSON.parse(fs.readFileSync("../release-apply-results.json","utf8")); console.log((data.applied || []).length)')"
-            failed_count="$(node -e 'const fs=require("fs"); const data=JSON.parse(fs.readFileSync("../release-apply-results.json","utf8")); console.log((data.failed || []).length)')"
+          if [[ -f "$apply_results_file" ]]; then
+            applied_count="$(node -e 'const fs=require("fs"); const data=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log((data.applied || []).length)' "$apply_results_file")"
+            failed_count="$(node -e 'const fs=require("fs"); const data=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log((data.failed || []).length)' "$apply_results_file")"
             printf "Release reconciliation applied %s actions with %s failures.\n" "$applied_count" "$failed_count"
           fi
 
@@ -356,7 +300,7 @@ jobs:
           fi
 
           if [[ -n "$PR_NUMBER" ]]; then
-            if [[ -f ../release-apply-results.json ]]; then
+            if [[ -f "$apply_results_file" ]]; then
               gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. Applied ${applied_count} actions with ${failed_count} failures. ${SUMMARY}"
             else
               gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. ${SUMMARY}"

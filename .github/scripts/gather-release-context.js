@@ -2,13 +2,14 @@
 
 const cp = require("child_process")
 const fs = require("fs")
+const path = require("path")
 
 const MAX_COMMITS = 1000
 const MAX_FILES = 1000
 
-function readFileMaybe(path, max) {
+function readFileMaybe(filePath, max) {
   try {
-    const text = fs.readFileSync(path, "utf8")
+    const text = fs.readFileSync(filePath, "utf8")
 
     return typeof max === "number" ? text.slice(0, max) : text
   } catch {
@@ -119,12 +120,13 @@ function buildContext({
 }
 
 function main() {
+  const artifactDir = process.env.RELEASE_ARTIFACT_DIR
   const git = args => cp.execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()
 
-  const allCommits = parseCommits(readFileMaybe("../commits.tsv"))
+  const allCommits = parseCommits(readFileMaybe(path.join(artifactDir, "commits.tsv")))
   const commitIndexBySha = new Map(allCommits.map((commit, index) => [commit.sha, index]))
 
-  const releasePages = JSON.parse(readFileMaybe("../existing-releases.raw.json") || "[]")
+  const releasePages = JSON.parse(readFileMaybe(path.join(artifactDir, "existing-releases.raw.json")) || "[]")
   const existingReleases = buildExistingReleases(releasePages, commitIndexBySha, git)
 
   const { commits, releaseIndexes, commitsSinceOldestRelease } = selectCommitWindow(
@@ -133,7 +135,7 @@ function main() {
     commitIndexBySha,
     MAX_COMMITS
   )
-  const allFiles = readFileMaybe("../files.txt").split("\n").filter(Boolean)
+  const allFiles = readFileMaybe(path.join(artifactDir, "files.txt")).split("\n").filter(Boolean)
 
   const context = buildContext({
     allCommits,
@@ -154,7 +156,7 @@ function main() {
     maxFiles: MAX_FILES
   })
 
-  fs.writeFileSync("../release-context.json", JSON.stringify(context, null, 2))
+  fs.writeFileSync(path.join(artifactDir, "release-context.json"), JSON.stringify(context, null, 2))
   fs.appendFileSync(process.env.GITHUB_OUTPUT, `commit_count=${allCommits.length}\n`)
   fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_count=${existingReleases.length}\n`)
   fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_sha=${context.releaseSha}\n`)

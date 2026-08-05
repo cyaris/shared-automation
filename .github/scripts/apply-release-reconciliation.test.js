@@ -10,6 +10,8 @@ const {
   selectActionableActions
 } = require("./apply-release-reconciliation.js")
 
+const TEST_ARTIFACT_DIR = "/artifacts"
+
 function noopWriteFile() {}
 
 test("selectActionableActions keeps only create and update actions", () => {
@@ -57,6 +59,7 @@ test("applyAction creates a release when the tag does not already exist", () => 
     index: 0,
     context: { releaseSha: "sha-a" },
     run,
+    env: { RELEASE_ARTIFACT_DIR: TEST_ARTIFACT_DIR },
     writeFile: noopWriteFile
   })
 
@@ -72,7 +75,7 @@ test("applyAction creates a release when the tag does not already exist", () => 
     "--title",
     "Title",
     "--notes-file",
-    "../release-notes-0.md",
+    `${TEST_ARTIFACT_DIR}/release-notes-0.md`,
     "--latest"
   ])
 })
@@ -90,6 +93,7 @@ test("applyAction edits an existing release for update actions", () => {
     index: 2,
     context: { releaseSha: "sha-b" },
     run,
+    env: { RELEASE_ARTIFACT_DIR: TEST_ARTIFACT_DIR },
     writeFile: noopWriteFile
   })
 
@@ -102,8 +106,61 @@ test("applyAction edits an existing release for update actions", () => {
     "--title",
     "New Title",
     "--notes-file",
-    "../release-notes-2.md"
+    `${TEST_ARTIFACT_DIR}/release-notes-2.md`
   ])
+})
+
+test("applyAction runs the ancestry check when a default branch is resolved from env", () => {
+  const calls = []
+  const run = (command, args) => {
+    calls.push([command, args])
+
+    if (command === "git" && args[0] === "rev-list") {
+      throw new Error("tag not found")
+    }
+
+    return ""
+  }
+
+  applyAction({
+    action: { action: "create", tag: "v1.0.0", target_sha: "sha-a", title: "Title", notes: "Notes" },
+    index: 0,
+    context: { releaseSha: "sha-a" },
+    run,
+    env: { DEFAULT_BRANCH_INPUT: "main", RELEASE_ARTIFACT_DIR: TEST_ARTIFACT_DIR },
+    writeFile: noopWriteFile
+  })
+
+  const ancestryCall = calls.find(([command, args]) => command === "git" && args[0] === "merge-base")
+
+  assert.deepEqual(ancestryCall[1], ["merge-base", "--is-ancestor", "sha-a", "origin/main"])
+})
+
+test("applyAction skips the ancestry check when env resolves no default branch", () => {
+  const calls = []
+  const run = (command, args) => {
+    calls.push([command, args])
+
+    if (command === "git" && args[0] === "rev-list") {
+      throw new Error("tag not found")
+    }
+
+    return ""
+  }
+
+  applyAction({
+    action: { action: "create", tag: "v1.0.0", target_sha: "sha-a", title: "Title", notes: "Notes" },
+    index: 0,
+    context: { releaseSha: "sha-a" },
+    run,
+    env: { RELEASE_ARTIFACT_DIR: TEST_ARTIFACT_DIR },
+    writeFile: noopWriteFile
+  })
+
+  assert.equal(
+    calls.some(([command, args]) => command === "git" && args[0] === "merge-base"),
+    false
+  )
 })
 
 test("applyAction rejects a create action whose tag already points elsewhere", () => {
@@ -122,6 +179,7 @@ test("applyAction rejects a create action whose tag already points elsewhere", (
         index: 0,
         context: { releaseSha: "sha-a" },
         run,
+        env: { RELEASE_ARTIFACT_DIR: TEST_ARTIFACT_DIR },
         writeFile: noopWriteFile
       }),
     /Release tag v1\.0\.0 points to sha-existing, not sha-a/
