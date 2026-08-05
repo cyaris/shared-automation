@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - ".github/scripts/**"
+      - ".github/workflows/ci-self.yml"
+      - ".github/workflows/ci.yml"
+      - ".gitignore"
       - ".prettierrc.cjs"
       - "eslint.config.mjs"
       - "package-lock.json"
@@ -13,6 +16,9 @@ on:
   pull_request:
     paths:
       - ".github/scripts/**"
+      - ".github/workflows/ci-self.yml"
+      - ".github/workflows/ci.yml"
+      - ".gitignore"
       - ".prettierrc.cjs"
       - "eslint.config.mjs"
       - "package-lock.json"
