@@ -8,11 +8,6 @@ on:
         required: false
         type: string
         default: ""
-      pr-number:
-        description: Optional pull request number to comment on.
-        required: false
-        type: string
-        default: ""
       policy-path:
         description: Local release policy path in the caller repository.
         required: false
@@ -23,18 +18,13 @@ on:
         required: false
         type: string
         default: gpt-5-mini
-      default-branch:
-        description: Default branch name. Leave blank to use the repository default branch.
-        required: false
-        type: string
-        default: ""
       dry-run:
         description: Decide and report release changes without applying them.
         required: false
         type: boolean
         default: false
       publish:
-        description: Apply selected release creates and updates. Keep false to report the plan only.
+        description: Create and update releases instead of only reporting the plan.
         required: false
         type: boolean
         default: false
@@ -43,11 +33,6 @@ on:
         required: false
         type: boolean
         default: true
-      review-artifact-retention-days:
-        description: Days to retain report-only review artifacts.
-        required: false
-        type: number
-        default: 30
       shared-automation-repository:
         description: Repository containing the shared release policy.
         required: false
@@ -76,7 +61,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: auto-release-${{ github.repository }}-${{ inputs.release-sha || github.sha }}
@@ -138,7 +122,6 @@ jobs:
         id: context
         working-directory: caller
         env:
-          DEFAULT_BRANCH_INPUT: ${{ inputs.default-branch }}
           EVENT_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           FETCH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           POLICY_PATH: ${{ inputs.policy-path }}
@@ -153,7 +136,7 @@ jobs:
             git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" fetch "$@"
           }
 
-          default_branch="${DEFAULT_BRANCH_INPUT:-$EVENT_DEFAULT_BRANCH}"
+          default_branch="$EVENT_DEFAULT_BRANCH"
           if ! git_fetch_origin --force --tags origin; then
             printf "Failed to fetch tags from %s.\n" "$GITHUB_REPOSITORY" >&2
             exit 1
@@ -234,15 +217,14 @@ jobs:
             commits.tsv
             files.txt
           if-no-files-found: error
-          retention-days: ${{ inputs.review-artifact-retention-days }}
+          retention-days: 30
 
       - name: Apply release reconciliation
         id: apply
         if: inputs.dry-run == false && inputs.publish == true
         working-directory: caller
         env:
-          DEFAULT_BRANCH_INPUT: ${{ inputs.default-branch }}
-          EVENT_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           FETCH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
         run: |
           set -euo pipefail
@@ -253,7 +235,7 @@ jobs:
             git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" fetch "$@"
           }
 
-          default_branch="${DEFAULT_BRANCH_INPUT:-$EVENT_DEFAULT_BRANCH}"
+          default_branch="$DEFAULT_BRANCH"
           if ! git_fetch_origin --force --tags origin; then
             printf "Failed to fetch tags from %s.\n" "$GITHUB_REPOSITORY" >&2
             exit 1
@@ -275,7 +257,6 @@ jobs:
           APPLY_OUTCOME: ${{ steps.apply.outcome }}
           CREATE_COUNT: ${{ steps.plan.outputs.create_count }}
           DRY_RUN: ${{ inputs.dry-run }}
-          PR_NUMBER: ${{ inputs.pr-number }}
           PUBLISH: ${{ inputs.publish }}
           SUMMARY: ${{ steps.plan.outputs.summary }}
           UPDATE_COUNT: ${{ steps.plan.outputs.update_count }}
@@ -297,12 +278,4 @@ jobs:
 
           if [[ "$DRY_RUN" == "true" || "$PUBLISH" != "true" ]]; then
             printf "Release reconciliation was not applied because publish=%s and dry-run=%s.\n" "$PUBLISH" "$DRY_RUN"
-          fi
-
-          if [[ -n "$PR_NUMBER" ]]; then
-            if [[ -f "$apply_results_file" ]]; then
-              gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. Applied ${applied_count} actions with ${failed_count} failures. ${SUMMARY}"
-            else
-              gh pr comment "$PR_NUMBER" --body "Release reconciliation planned ${CREATE_COUNT} creates and ${UPDATE_COUNT} updates. ${SUMMARY}"
-            fi
           fi
