@@ -415,6 +415,7 @@ jobs:
 
             const tagPattern = /^v[0-9]+(\.[0-9]+){0,2}([._-][A-Za-z0-9]+)?$/
             const seenCreateTags = new Set()
+            const seenTargetShas = new Set()
             const normalizedActions = plan.actions.map((action) => ({
               action: String(action.action || "").trim(),
               tag: String(action.tag || "").trim(),
@@ -448,7 +449,11 @@ jobs:
                 if (seenCreateTags.has(action.tag)) {
                   throw new Error(`Duplicate create action for tag: ${action.tag}`)
                 }
+                if (seenTargetShas.has(action.target_sha)) {
+                  throw new Error(`Multiple create actions target the same commit: ${action.tag} ${action.target_sha}`)
+                }
                 seenCreateTags.add(action.tag)
+                seenTargetShas.add(action.target_sha)
               } else if (action.action === "update") {
                 if (!context.updateExisting) {
                   action.action = "skip"
