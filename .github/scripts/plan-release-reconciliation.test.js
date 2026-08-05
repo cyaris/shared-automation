@@ -51,7 +51,17 @@ test("validateActions accepts a well-formed create action", () => {
     { action: "create", tag: "v1.0.0", target_sha: "sha-a", title: "Title", notes: "Notes", reason: "Reason" }
   ])
 
-  assert.deepEqual(validateActions(actions, baseContext()), actions)
+  const validated = validateActions(actions, baseContext())
+
+  assert.equal(validated.length, 1)
+  assert.deepEqual(validated[0], {
+    action: "create",
+    tag: "v1.0.0",
+    target_sha: "sha-a",
+    title: "Title",
+    notes: "Notes",
+    reason: "Reason"
+  })
 })
 
 test("validateActions rejects an invalid tag format", () => {
@@ -89,6 +99,20 @@ test("validateActions rejects two create actions targeting the same commit", () 
   assert.throws(
     () => validateActions(actions, baseContext()),
     /Multiple create actions target the same commit: v2\.0\.0 sha-a/
+  )
+})
+
+test("validateActions accepts two create actions targeting distinct commits", () => {
+  const actions = normalizeActions([
+    { action: "create", tag: "v1.0.0", target_sha: "sha-a", title: "Title", notes: "Notes", reason: "Reason" },
+    { action: "create", tag: "v2.0.0", target_sha: "sha-b", title: "Title 2", notes: "Notes 2", reason: "Reason 2" }
+  ])
+
+  const validated = validateActions(actions, baseContext())
+
+  assert.deepEqual(
+    validated.map(action => action.tag),
+    ["v1.0.0", "v2.0.0"]
   )
 })
 
