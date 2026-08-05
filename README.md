@@ -158,8 +158,8 @@ Important inputs:
 - `shared-automation-repository` and `shared-automation-ref` for the shared release policy checkout
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
-The workflow always reconciles against the caller repository's own default branch; report-only review artifacts are
-retained for 30 days.
+The workflow always reconciles against the caller repository's GitHub-reported default branch, with no override input;
+report-only review artifacts are retained for 30 days.
 
 The local `.github/workflows/auto-release-self.yml` wrapper uses the reusable defaults, so manual runs in this
 repository are report-only unless `publish` is explicitly enabled.
