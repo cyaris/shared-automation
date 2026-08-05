@@ -56,7 +56,7 @@ test("resolveReleaseTargetSha returns an empty string when both lookups fail", (
   assert.equal(resolveReleaseTargetSha({ tag_name: "v1.0.0" }, git), "")
 })
 
-test("buildExistingReleases drops drafts and sorts by commit history order", () => {
+test("buildExistingReleases keeps drafts and sorts by commit history order", () => {
   const git = args => {
     const tag = args[3].replace("refs/tags/", "").replace("^{}", "")
 
@@ -86,7 +86,11 @@ test("buildExistingReleases drops drafts and sorts by commit history order", () 
 
   assert.deepEqual(
     existingReleases.map(release => release.tag),
-    ["v1.0.0", "v2.0.0"]
+    ["v1.0.0", "v2.0.0", "v3.0.0-draft"]
+  )
+  assert.deepEqual(
+    existingReleases.map(release => release.draft),
+    [false, false, true]
   )
 })
 

@@ -43,13 +43,13 @@ function buildExistingReleases(releasePages, commitIndexBySha, git) {
   const rawReleases = releasePages.flat()
 
   return rawReleases
-    .filter(release => !release.draft)
     .map(release => ({
       tag: release.tag_name || "",
       title: release.name || "",
       notes: release.body || "",
       publishedAt: release.published_at || "",
       prerelease: Boolean(release.prerelease),
+      draft: Boolean(release.draft),
       targetCommitish: release.target_commitish || "",
       targetSha: resolveReleaseTargetSha(release, git),
       url: release.html_url || ""
