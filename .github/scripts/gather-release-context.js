@@ -17,15 +17,32 @@ function readFileMaybe(filePath, max) {
   }
 }
 
+function escapesRoot(candidatePath, root) {
+  const relative = path.relative(root, candidatePath)
+
+  return relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
+}
+
 function resolvePolicyPath(policyPath, repoRoot) {
   if (!policyPath) {
     return policyPath
   }
 
   const resolved = path.resolve(repoRoot, policyPath)
-  const relative = path.relative(repoRoot, resolved)
 
-  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+  if (escapesRoot(resolved, repoRoot)) {
+    throw new Error(`policy-path escapes the caller repository: ${policyPath}`)
+  }
+
+  let realPath
+
+  try {
+    realPath = fs.realpathSync(resolved)
+  } catch {
+    return resolved
+  }
+
+  if (escapesRoot(realPath, fs.realpathSync(repoRoot))) {
     throw new Error(`policy-path escapes the caller repository: ${policyPath}`)
   }
 

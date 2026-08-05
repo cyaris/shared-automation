@@ -2,6 +2,8 @@
 
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
+const fs = require("fs")
+const os = require("os")
 const path = require("path")
 
 const {
@@ -79,6 +81,24 @@ test("resolvePolicyPath rejects a relative traversal outside the repository root
 
 test("resolvePolicyPath rejects an absolute path outside the repository root", () => {
   assert.throws(() => resolvePolicyPath("/etc/passwd", "/repo"), /policy-path escapes the caller repository/)
+})
+
+test("resolvePolicyPath rejects an in-repository symlink that points outside the repository", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "policy-path-repo-"))
+  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "policy-path-outside-"))
+
+  try {
+    const outsideFile = path.join(outsideDir, "secret.yml")
+    const symlinkPath = path.join(repoRoot, "release-policy.yml")
+
+    fs.writeFileSync(outsideFile, "secret: true\n")
+    fs.symlinkSync(outsideFile, symlinkPath)
+
+    assert.throws(() => resolvePolicyPath("release-policy.yml", repoRoot), /policy-path escapes the caller repository/)
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true })
+    fs.rmSync(outsideDir, { recursive: true, force: true })
+  }
 })
 
 test("buildExistingReleases keeps drafts and sorts by commit history order", () => {
