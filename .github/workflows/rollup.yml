@@ -123,10 +123,6 @@ on:
         description: Optional AWS session token used when aws-role-to-assume is omitted.
         required: false
 
-permissions:
-  contents: read
-  id-token: write
-
 jobs:
   resolve-inputs:
     runs-on: ubuntu-latest
@@ -302,13 +298,35 @@ jobs:
           printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
           exit 1
 
+      - name: Check upload freshness
+        id: freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          current_sha="$(gh api "repos/${REPOSITORY}/commits/${REF_NAME}" --jq .sha)"
+
+          if [[ "$current_sha" != "$RUN_SHA" ]]; then
+            printf "::warning::Skipping upload: %s is no longer the head of %s (current head is %s). A newer run already handled this push.\n" \
+              "$RUN_SHA" "$REF_NAME" "$current_sha"
+            printf "is_current=false\n" >> "$GITHUB_OUTPUT"
+          else
+            printf "is_current=true\n" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout caller repository
+        if: steps.freshness.outputs.is_current == 'true'
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           path: ${{ github.event.repository.name }}
           persist-credentials: false
 
       - name: Checkout svelte-lib
+        if: steps.freshness.outputs.is_current == 'true'
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: ${{ inputs.svelte-lib-repository }}
@@ -318,6 +336,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout shared automation
+        if: steps.freshness.outputs.is_current == 'true'
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: ${{ inputs.shared-automation-repository }}
@@ -327,6 +346,7 @@ jobs:
           persist-credentials: false
 
       - name: Rollup and upload embedded bundle
+        if: steps.freshness.outputs.is_current == 'true'
         uses: ./shared-automation/.github/actions/rollup-upload
         with:
           caller-repository-name: ${{ github.event.repository.name }}
