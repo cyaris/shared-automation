@@ -184,9 +184,12 @@ the reviewed plan is approved.
 ### `.github/workflows/ci-self.yml`
 
 Local workflow for this repository's own `.github/scripts` package. It runs on pushes to `main` and pull requests that
-touch `.github/scripts/**`, `package.json`, `package-lock.json`, `eslint.config.mjs`, or `.prettierrc.cjs`, plus manual
-dispatch, then delegates to `.github/workflows/ci.yml` with formatting, linting, and `npm test` enabled. `run-check` and
-`run-build` are disabled since this repository has no type check or build step.
+touch `.github/scripts/**`, `.github/workflows/ci-self.yml`, `.github/workflows/ci.yml`, `.gitignore`, `.prettierrc.cjs`,
+`eslint.config.mjs`, `package.json`, or `package-lock.json`, plus manual dispatch, then delegates to
+`.github/workflows/ci.yml` with formatting, linting, and `npm test` enabled. `run-check` and `run-build` are disabled
+since this repository has no type check or build step. Manual dispatch from the GitHub Actions UI is accepted only for
+`allowed-dispatch-actor` (default `cyaris`); `.github/workflows/ci.yml` rejects any other dispatching actor before
+running the checks.
 
 ### `.github/workflows/ci.yml`
 
