@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/scripts/**"
+      - ".github/workflows/ci-self.yml"
+      - ".github/workflows/ci.yml"
+      - ".gitignore"
+      - ".prettierrc.cjs"
+      - "eslint.config.mjs"
+      - "package-lock.json"
+      - "package.json"
+  pull_request:
+    paths:
+      - ".github/scripts/**"
+      - ".github/workflows/ci-self.yml"
+      - ".github/workflows/ci.yml"
+      - ".gitignore"
+      - ".prettierrc.cjs"
+      - "eslint.config.mjs"
+      - "package-lock.json"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-package-ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      run-check: false
+      run-build: false
+      run-test: true

@@ -14,10 +14,7 @@
   "minimumReleaseAge": "3 days",
   "labels": ["dependencies"],
   "ignorePaths": ["**/node_modules/**", "**/_site/**", "**/.svelte-kit/**", "**/dist/**", "**/build/**"],
-  "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": ["before 6am on monday"]
-  },
+  "lockFileMaintenance": { "enabled": true, "schedule": ["before 6am on monday"] },
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
@@ -47,6 +44,22 @@
       "groupName": "npm development dependency minor and patch updates",
       "groupSlug": "npm-dev-minor-patch",
       "labels": ["dependencies", "npm"]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/workflow-validation\\.yml$/"],
+      "matchStrings": ["go install github\\.com/rhysd/actionlint/cmd/actionlint@(?<currentValue>v[0-9.]+)"],
+      "depNameTemplate": "rhysd/actionlint",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/workflow-validation\\.yml$/"],
+      "matchStrings": ["zizmor==(?<currentValue>[0-9.]+)"],
+      "depNameTemplate": "zizmor",
+      "datasourceTemplate": "pypi"
     }
   ]
 }

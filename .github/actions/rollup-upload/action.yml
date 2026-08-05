@@ -97,9 +97,14 @@ runs:
             continue
           fi
 
+          if [[ "$spec" == *:*:*:* ]]; then
+            printf "Invalid local dependency spec: %s\n" "$spec" >&2
+            exit 1
+          fi
+
           IFS=: read -r repository checkout_path ref <<< "$spec"
 
-          if [[ -z "$repository" || -z "$checkout_path" || -z "$ref" ]]; then
+          if [[ -z "${repository:-}" || -z "${checkout_path:-}" || -z "${ref:-}" ]]; then
             printf "Invalid local dependency spec: %s\n" "$spec" >&2
             exit 1
           fi

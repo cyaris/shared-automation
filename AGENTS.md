@@ -73,9 +73,9 @@
 - Keep scheduled workflows simple. Prefer one schedule away from the top of the hour over multiple UTC schedules plus a
   local-time gate, unless the repository truly needs exact local-time behavior. If a schedule is only approximate, let
   the job run and document the chosen UTC time instead of creating helper jobs that make expected runs appear skipped.
-- Prefer AWS OIDC for deployment workflows. Caller jobs that pass `aws-role-to-assume` must grant `id-token: write`;
-  static AWS access-key secrets may remain only as a compatibility fallback until callers have repository-specific OIDC
-  roles configured.
+- Prefer AWS OIDC for deployment workflows. Reusable workflows and caller jobs that pass `aws-role-to-assume` must grant
+  `id-token: write`; static AWS access-key secrets may remain only as a compatibility fallback until callers have
+  repository-specific OIDC roles configured.
 - Write clear, specific commit subjects that describe the actual change. Prefer plain language over release-tool syntax,
   and do not exaggerate routine maintenance as user-facing work.
 - Treat upstream automation, shared workflow reference, dependency-pin, Renovate, and release-policy maintenance as
@@ -114,3 +114,6 @@
   suppressions.
 - Keep third-party GitHub Actions hash-pinned when `zizmor` requires it. First-party reusable workflow callers may use
   `cyaris/shared-automation` refs on `main` so callers pick up the latest shared workflow implementation.
+- Extract non-trivial inline Node.js logic out of `run:` heredocs into standalone files under `.github/scripts/`,
+  covered by `node --test`, rather than leaving security-relevant or otherwise complex logic untested inside a workflow
+  step. Wire the reusable CI workflow's `run-test` input to run those tests before rollout.
