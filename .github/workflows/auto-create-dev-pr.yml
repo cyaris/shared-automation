@@ -1,4 +1,4 @@
-name: Auto-create dev pull request
+name: Shared auto-create dev pull request
 
 on:
   workflow_call:
