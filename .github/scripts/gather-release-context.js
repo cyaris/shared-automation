@@ -123,10 +123,10 @@ function main() {
   const artifactDir = process.env.RELEASE_ARTIFACT_DIR
   const git = args => cp.execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()
 
-  const allCommits = parseCommits(readFileMaybe(path.join(artifactDir, "commits.tsv")))
+  const allCommits = parseCommits(fs.readFileSync(path.join(artifactDir, "commits.tsv"), "utf8"))
   const commitIndexBySha = new Map(allCommits.map((commit, index) => [commit.sha, index]))
 
-  const releasePages = JSON.parse(readFileMaybe(path.join(artifactDir, "existing-releases.raw.json")) || "[]")
+  const releasePages = JSON.parse(fs.readFileSync(path.join(artifactDir, "existing-releases.raw.json"), "utf8"))
   const existingReleases = buildExistingReleases(releasePages, commitIndexBySha, git)
 
   const { commits, releaseIndexes, commitsSinceOldestRelease } = selectCommitWindow(
@@ -135,7 +135,7 @@ function main() {
     commitIndexBySha,
     MAX_COMMITS
   )
-  const allFiles = readFileMaybe(path.join(artifactDir, "files.txt")).split("\n").filter(Boolean)
+  const allFiles = fs.readFileSync(path.join(artifactDir, "files.txt"), "utf8").split("\n").filter(Boolean)
 
   const context = buildContext({
     allCommits,
