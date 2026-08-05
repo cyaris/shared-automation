@@ -8,13 +8,8 @@ on:
         required: false
         type: string
         default: ""
-      pr-number:
-        description: Pull request number to comment on.
-        required: false
-        type: string
-        default: ""
       publish:
-        description: Apply selected release creates and updates. Keep false to report the plan only.
+        description: Create and update releases instead of only reporting the plan.
         required: false
         type: boolean
         default: false
@@ -23,24 +18,16 @@ on:
         required: false
         type: boolean
         default: true
-      review-artifact-retention-days:
-        description: Days to retain report-only review artifacts.
-        required: false
-        type: number
-        default: 30
 
 jobs:
   auto-release:
     uses: ./.github/workflows/auto-release.yml
     permissions:
       contents: write
-      pull-requests: write
     with:
-      pr-number: ${{ github.event.inputs['pr-number'] }}
       release-sha: ${{ github.event.inputs['release-sha'] }}
       publish: ${{ github.event.inputs.publish == 'true' }}
       update-existing: ${{ github.event.inputs['update-existing'] != 'false' }}
-      review-artifact-retention-days: ${{ fromJSON(github.event.inputs['review-artifact-retention-days'] || '30') }}
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}

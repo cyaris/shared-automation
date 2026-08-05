@@ -139,8 +139,6 @@ jobs:
     uses: cyaris/shared-automation/.github/workflows/auto-release.yml@main
     permissions:
       contents: write
-      issues: write
-      pull-requests: write
     with:
       publish: false
       update-existing: true
@@ -152,14 +150,16 @@ jobs:
 
 Important inputs:
 
-- `release-sha`, `pr-number`, `policy-path`, and `default-branch`
+- `release-sha`, defaulting to the default branch tip, and `policy-path`
 - `openai-model`, defaulting to `gpt-5-mini`
 - `dry-run` for decision reporting without applying release changes, defaulting to `false`
-- `publish` for applying selected release creates and updates, defaulting to `false`
+- `publish` for creating and updating releases instead of only reporting the plan, defaulting to `false`
 - `update-existing` for allowing edits to existing release titles and notes, defaulting to `true`
-- `review-artifact-retention-days` for retaining report-only plan artifacts, defaulting to `30`
 - `shared-automation-repository` and `shared-automation-ref` for the shared release policy checkout
 - `allowed-dispatch-actor`, defaulting to `cyaris`
+
+The workflow always reconciles against the caller repository's GitHub-reported default branch, with no override input;
+report-only review artifacts are retained for 30 days.
 
 The local `.github/workflows/auto-release-self.yml` wrapper uses the reusable defaults, so manual runs in this
 repository are report-only unless `publish` is explicitly enabled.

@@ -36,9 +36,8 @@ test("resolveLatestArgs marks the release-sha target as latest", () => {
   assert.deepEqual(resolveLatestArgs({ target_sha: "sha-b" }, context), ["--latest=false"])
 })
 
-test("resolveDefaultBranch prefers the input over the event default branch", () => {
-  assert.equal(resolveDefaultBranch({ DEFAULT_BRANCH_INPUT: "release", EVENT_DEFAULT_BRANCH: "main" }), "release")
-  assert.equal(resolveDefaultBranch({ EVENT_DEFAULT_BRANCH: "main" }), "main")
+test("resolveDefaultBranch reads the default branch from env", () => {
+  assert.equal(resolveDefaultBranch({ DEFAULT_BRANCH: "main" }), "main")
   assert.equal(resolveDefaultBranch({}), "")
 })
 
@@ -127,7 +126,7 @@ test("applyAction runs the ancestry check when a default branch is resolved from
     index: 0,
     context: { releaseSha: "sha-a" },
     run,
-    env: { DEFAULT_BRANCH_INPUT: "main", RELEASE_ARTIFACT_DIR: TEST_ARTIFACT_DIR },
+    env: { DEFAULT_BRANCH: "main", RELEASE_ARTIFACT_DIR: TEST_ARTIFACT_DIR },
     writeFile: noopWriteFile
   })
 

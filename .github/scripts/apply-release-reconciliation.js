@@ -13,7 +13,7 @@ function resolveLatestArgs(action, context) {
 }
 
 function resolveDefaultBranch(env) {
-  return env.DEFAULT_BRANCH_INPUT || env.EVENT_DEFAULT_BRANCH || ""
+  return env.DEFAULT_BRANCH || ""
 }
 
 function applyAction({ action, index, context, run, env = process.env, writeFile = fs.writeFileSync }) {
