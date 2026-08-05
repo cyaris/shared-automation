@@ -2,11 +2,13 @@
 
 const assert = require("node:assert/strict")
 const { test } = require("node:test")
+const path = require("path")
 
 const {
   buildContext,
   buildExistingReleases,
   parseCommits,
+  resolvePolicyPath,
   resolveReleaseTargetSha,
   selectCommitWindow
 } = require("./gather-release-context.js")
@@ -54,6 +56,29 @@ test("resolveReleaseTargetSha returns an empty string when both lookups fail", (
   }
 
   assert.equal(resolveReleaseTargetSha({ tag_name: "v1.0.0" }, git), "")
+})
+
+test("resolvePolicyPath accepts a path inside the repository root", () => {
+  const repoRoot = "/repo"
+
+  assert.equal(
+    resolvePolicyPath(".github/release-policy.yml", repoRoot),
+    path.join(repoRoot, ".github/release-policy.yml")
+  )
+})
+
+test("resolvePolicyPath passes through a falsy policy path unchanged", () => {
+  assert.equal(resolvePolicyPath("", "/repo"), "")
+  assert.equal(resolvePolicyPath(undefined, "/repo"), undefined)
+})
+
+test("resolvePolicyPath rejects a relative traversal outside the repository root", () => {
+  assert.throws(() => resolvePolicyPath("../outside.yml", "/repo"), /policy-path escapes the caller repository/)
+  assert.throws(() => resolvePolicyPath("../../etc/passwd", "/repo"), /policy-path escapes the caller repository/)
+})
+
+test("resolvePolicyPath rejects an absolute path outside the repository root", () => {
+  assert.throws(() => resolvePolicyPath("/etc/passwd", "/repo"), /policy-path escapes the caller repository/)
 })
 
 test("buildExistingReleases keeps drafts and sorts by commit history order", () => {

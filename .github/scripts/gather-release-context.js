@@ -17,6 +17,21 @@ function readFileMaybe(filePath, max) {
   }
 }
 
+function resolvePolicyPath(policyPath, repoRoot) {
+  if (!policyPath) {
+    return policyPath
+  }
+
+  const resolved = path.resolve(repoRoot, policyPath)
+  const relative = path.relative(repoRoot, resolved)
+
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(`policy-path escapes the caller repository: ${policyPath}`)
+  }
+
+  return resolved
+}
+
 function parseCommits(commitsText) {
   return commitsText
     .split("\n")
@@ -150,7 +165,7 @@ function main() {
     policyPath: process.env.POLICY_PATH,
     updateExisting: process.env.UPDATE_EXISTING,
     basePolicy: readFileMaybe("../shared-automation/.github/release-policy.yml"),
-    localPolicy: readFileMaybe(process.env.POLICY_PATH),
+    localPolicy: readFileMaybe(resolvePolicyPath(process.env.POLICY_PATH, process.cwd())),
     agentsGuidance: readFileMaybe("AGENTS.md", 24000),
     maxCommits: MAX_COMMITS,
     maxFiles: MAX_FILES
@@ -168,6 +183,7 @@ module.exports = {
   buildContext,
   buildExistingReleases,
   parseCommits,
+  resolvePolicyPath,
   resolveReleaseTargetSha,
   selectCommitWindow
 }
