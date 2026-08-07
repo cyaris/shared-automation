@@ -283,9 +283,9 @@ declared via `local-dependency-repositories`) can change without the caller repo
 resolves the same upstream refs `rollup.yml` resolves, compares each one against a repository variable recording the
 last-seen commit SHA, and when any upstream dependency has moved, dispatches the caller's own `Rollup` workflow via
 `workflow_dispatch` so the caller rebuilds and redeploys with current upstream code. The `svelte-lib` dependency is
-always compared against `main`. Each `local-dependency-repositories` entry is compared against the ref given in its
-own spec rather than a fixed branch, matching `rollup.yml`'s per-dependency ref convention; there is no per-pull-request
-tracking.
+always compared against `main`. Each `local-dependency-repositories` entry must track `main`, `master`, or a pinned
+commit SHA unless `allow-nonproduction-refs` is enabled, since a match dispatches a live Rollup redeploy and a moving
+nonproduction branch would otherwise do that on unrelated activity; there is no per-pull-request tracking.
 
 Important inputs:
 
@@ -293,6 +293,8 @@ Important inputs:
 - `local-dependency-repositories` for additional dependencies to watch, in the same `owner/repo:path:ref` format used
   by `rollup.yml` — callers with a Rollup dependency list can pass the identical value; each checkout path is
   restricted to letters, digits, hyphens, and underscores since it becomes part of a repository variable name
+- `allow-nonproduction-refs`, defaulting to `false` — set to `true` only for a documented, intentional need to watch a
+  `local-dependency-repositories` entry on a ref other than `main`, `master`, or a pinned commit SHA
 - `rollup-workflow-file`, the workflow file name in the caller repository to dispatch, defaulting to `rollup.yml`
 - `dispatch-ref`, required, the branch to dispatch that workflow on
 - `allowed-dispatch-actor`, defaulting to `cyaris`

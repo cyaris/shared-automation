@@ -13,6 +13,11 @@ on:
         required: false
         type: string
         default: ""
+      allow-nonproduction-refs:
+        description: Allow local-dependency-repositories entries to track a ref other than main, master, or a pinned commit SHA. Enable only for a documented, intentional nonproduction watch.
+        required: false
+        type: boolean
+        default: false
       rollup-workflow-file:
         description: Workflow file name in the caller repository to dispatch when an upstream dependency has changed.
         required: false
@@ -69,6 +74,7 @@ jobs:
       - name: Resolve and compare upstream refs
         id: check
         env:
+          ALLOW_NONPRODUCTION_REFS: ${{ inputs.allow-nonproduction-refs }}
           GH_TOKEN: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN }}
           LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.local-dependency-repositories }}
           REPOSITORY: ${{ github.repository }}
@@ -201,6 +207,11 @@ jobs:
 
             if [[ ! "$dep_checkout_path" =~ ^[A-Za-z0-9_-]+$ ]]; then
               printf "Invalid checkout path in local dependency spec %s: only letters, digits, hyphens, and underscores are supported.\n" "$spec" >&2
+              exit 1
+            fi
+
+            if [[ "$ALLOW_NONPRODUCTION_REFS" != "true" && "$dep_ref" != "main" && "$dep_ref" != "master" && ! "$dep_ref" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              printf "Invalid local dependency spec %s: ref must be main, master, or a full commit SHA unless allow-nonproduction-refs is enabled.\n" "$spec" >&2
               exit 1
             fi
 
