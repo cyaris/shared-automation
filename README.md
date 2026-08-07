@@ -276,6 +276,40 @@ Optional secrets:
 Private dependency note: callers that install private repositories through local `file:` dependencies need a
 checkout-capable token.
 
+### `.github/workflows/upstream-watch.yml`
+
+Reusable daily-cron watcher for repositories whose local `file:` dependencies (`svelte-lib`, and optionally others
+declared via `local-dependency-repositories`) can change without the caller repository itself getting a new commit. It
+resolves the same upstream refs `rollup.yml` resolves, compares each one against a repository variable recording the
+last-seen commit SHA, and when any upstream dependency has moved, dispatches the caller's own `Rollup` workflow via
+`workflow_dispatch` so the caller rebuilds and redeploys with current upstream code. Only `main`/`master` upstream
+branches are watched; there is no per-branch or per-pull-request tracking.
+
+Important inputs:
+
+- `svelte-lib-repository`, defaulting to `cyaris/svelte-lib`
+- `local-dependency-repositories` for additional dependencies to watch, in the same `owner/repo:path:ref` format used
+  by `rollup.yml` — callers with a Rollup dependency list can pass the identical value
+- `rollup-workflow-file`, the workflow file name in the caller repository to dispatch, defaulting to `rollup.yml`
+- `dispatch-ref`, required, the branch to dispatch that workflow on
+- `allowed-dispatch-actor`, defaulting to `cyaris`
+
+Each watched dependency is tracked in a repository variable named `UPSTREAM_<PATH>_SHA`, derived from its checkout path
+(for example `svelte-lib` becomes `UPSTREAM_SVELTE_LIB_SHA`, and a `fireworks` dependency becomes
+`UPSTREAM_FIREWORKS_SHA`). The first run for a given dependency seeds that variable without dispatching a rollup, since
+there is no prior value to compare against. The stored SHA updates as soon as the dispatch call succeeds, not once the
+dispatched Rollup run finishes; a subsequent Rollup failure is visible in that workflow's own run history rather than
+retried by the next scheduled check.
+
+Required secret:
+
+- `CHECKOUT_TOKEN` or `RELEASE_TOKEN`, used to read upstream commits and to read and write the caller repository's
+  tracking variables. Unlike other reusable workflows, this one fails the run outright if neither secret is set, since
+  it cannot do its job without one.
+
+Private dependency note: `GITHUB_TOKEN` cannot write repository variables, so `CHECKOUT_TOKEN`/`RELEASE_TOKEN` must
+carry enough scope for that in addition to reading the watched upstream repositories.
+
 ### `.github/workflows/workflow-validation.yml`
 
 Reusable workflow validation for GitHub Actions and automation configuration. It runs on changes to workflow,
