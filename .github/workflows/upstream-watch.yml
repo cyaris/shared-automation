@@ -128,8 +128,26 @@ jobs:
 
           stored_value_for() {
             local variable_name="$1"
+            local error_output
+            local value
 
-            gh variable get "$variable_name" -R "$REPOSITORY" --jq .value 2>/dev/null || printf ""
+            error_output="$(mktemp)"
+            if value="$(gh api "repos/${REPOSITORY}/actions/variables/${variable_name}" --jq .value 2>"$error_output")"; then
+              rm -f "$error_output"
+              printf "%s\n" "$value"
+              return
+            fi
+
+            if grep -q "HTTP 404" "$error_output"; then
+              rm -f "$error_output"
+              printf ""
+              return
+            fi
+
+            printf "Failed to read repository variable %s.\n" "$variable_name" >&2
+            cat "$error_output" >&2
+            rm -f "$error_output"
+            exit 1
           }
 
           changed="false"
@@ -178,6 +196,11 @@ jobs:
 
             if [[ -z "${dep_repository:-}" || -z "${dep_checkout_path:-}" || -z "${dep_ref:-}" ]]; then
               printf "Invalid local dependency spec: %s\n" "$spec" >&2
+              exit 1
+            fi
+
+            if [[ ! "$dep_checkout_path" =~ ^[A-Za-z0-9_-]+$ ]]; then
+              printf "Invalid checkout path in local dependency spec %s: only letters, digits, hyphens, and underscores are supported.\n" "$spec" >&2
               exit 1
             fi
 
