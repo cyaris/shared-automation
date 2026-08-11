@@ -315,6 +315,10 @@ unmatched: the run logs it as deferred and leaves the stored SHA untouched, so t
 once it clears the offset, dispatched) on the next scheduled run rather than being missed. This keeps a rollup from
 firing on an upstream commit that is still landing.
 
+`stale-offset-minutes` only controls whether a rollup dispatch is triggered this cycle. Once triggered, Rollup always
+resolves every dependency to its latest commit on the configured ref at run time, not the specific commit that
+upstream-watch observed when it decided to dispatch.
+
 Required secret:
 
 - `CHECKOUT_TOKEN` or `RELEASE_TOKEN`, used to read upstream commits and to read and write the caller repository's
