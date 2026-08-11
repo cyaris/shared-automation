@@ -76,6 +76,17 @@ jobs:
             exit 1
           fi
 
+      - name: Validate stale offset input
+        env:
+          STALE_OFFSET_MINUTES: ${{ inputs.stale-offset-minutes }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$STALE_OFFSET_MINUTES" =~ ^[0-9]+$ ]]; then
+            printf "stale-offset-minutes must be a non-negative integer, got %s.\n" "$STALE_OFFSET_MINUTES" >&2
+            exit 1
+          fi
+
       - name: Resolve and compare upstream refs
         id: check
         env:

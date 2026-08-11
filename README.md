@@ -299,7 +299,8 @@ Important inputs:
 - `dispatch-ref`, required, the branch to dispatch that workflow on
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 - `stale-offset-minutes`, defaulting to `30` — the minimum age, in minutes, an upstream commit must have relative to
-  the current run time before it can trigger a rollup dispatch
+  the current run time before it can trigger a rollup dispatch; must be a non-negative integer, and the run fails
+  clearly if a negative or fractional value is supplied
 
 Each watched dependency is tracked in a repository variable named `UPSTREAM_<PATH>_SHA`, derived from its checkout path
 (for example `svelte-lib` becomes `UPSTREAM_SVELTE_LIB_SHA`, and a `fireworks` dependency becomes
