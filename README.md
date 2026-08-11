@@ -298,9 +298,6 @@ Important inputs:
 - `rollup-workflow-file`, the workflow file name in the caller repository to dispatch, defaulting to `rollup.yml`
 - `dispatch-ref`, required, the branch to dispatch that workflow on
 - `allowed-dispatch-actor`, defaulting to `cyaris`
-- `stale-offset-minutes`, defaulting to `30` — the minimum age, in minutes, an upstream commit must have relative to
-  the current run time before it can trigger a rollup dispatch; must be a non-negative integer, and the run fails
-  clearly if a negative or fractional value is supplied
 
 Each watched dependency is tracked in a repository variable named `UPSTREAM_<PATH>_SHA`, derived from its checkout path
 (for example `svelte-lib` becomes `UPSTREAM_SVELTE_LIB_SHA`, and a `fireworks` dependency becomes
@@ -308,16 +305,6 @@ Each watched dependency is tracked in a repository variable named `UPSTREAM_<PAT
 there is no prior value to compare against. The stored SHA updates as soon as the dispatch call succeeds, not once the
 dispatched Rollup run finishes; a subsequent Rollup failure is visible in that workflow's own run history rather than
 retried by the next scheduled check.
-
-When a watched ref's resolved commit differs from the stored SHA, the workflow reads that commit's committer date and
-compares it against the current run time minus `stale-offset-minutes`. A commit newer than that cutoff is left
-unmatched: the run logs it as deferred and leaves the stored SHA untouched, so the same commit is re-evaluated (and,
-once it clears the offset, dispatched) on the next scheduled run rather than being missed. This keeps a rollup from
-firing on an upstream commit that is still landing.
-
-`stale-offset-minutes` only controls whether a rollup dispatch is triggered this cycle. Once triggered, Rollup always
-resolves every dependency to its latest commit on the configured ref at run time, not the specific commit that
-upstream-watch observed when it decided to dispatch.
 
 Required secret:
 
