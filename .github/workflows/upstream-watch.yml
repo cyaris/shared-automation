@@ -32,6 +32,11 @@ on:
         required: false
         type: string
         default: cyaris
+      stale-offset-minutes:
+        description: Minimum age in minutes an upstream commit must have, relative to the current run time, before it can trigger a rollup dispatch.
+        required: false
+        type: number
+        default: 30
     secrets:
       CHECKOUT_TOKEN:
         description: Optional token with access to read upstream repositories and read/write repository variables.
@@ -78,6 +83,7 @@ jobs:
           GH_TOKEN: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN }}
           LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.local-dependency-repositories }}
           REPOSITORY: ${{ github.repository }}
+          STALE_OFFSET_MINUTES: ${{ inputs.stale-offset-minutes }}
           SVELTE_LIB_REPOSITORY: ${{ inputs.svelte-lib-repository }}
         run: |
           set -euo pipefail
@@ -126,6 +132,25 @@ jobs:
             exit 1
           }
 
+          commit_committed_at() {
+            local repository="$1"
+            local sha="$2"
+            local error_output
+            local value
+
+            error_output="$(mktemp)"
+            if value="$(gh api "repos/${repository}/commits/${sha}" --jq .commit.committer.date 2>"$error_output")"; then
+              rm -f "$error_output"
+              printf "%s\n" "$value"
+              return
+            fi
+
+            printf "Failed to read commit date for %s@%s.\n" "$repository" "$sha" >&2
+            cat "$error_output" >&2
+            rm -f "$error_output"
+            exit 1
+          }
+
           variable_name_for() {
             local checkout_path="$1"
 
@@ -159,6 +184,8 @@ jobs:
           changed="false"
           variable_updates=""
           summary=""
+          run_epoch="$(date -u +%s)"
+          stale_cutoff_epoch="$(( run_epoch - STALE_OFFSET_MINUTES * 60 ))"
 
           check_dependency() {
             local label="$1"
@@ -168,6 +195,8 @@ jobs:
             local variable_name
             local current_sha
             local stored_sha
+            local committed_at
+            local committed_epoch
 
             variable_name="$(variable_name_for "$checkout_path")"
             current_sha="$(resolve_github_ref "$repository" "$ref")"
@@ -177,10 +206,17 @@ jobs:
               printf "No stored SHA yet for %s (%s); seeding %s without triggering a rollup.\n" "$label" "$variable_name" "$current_sha"
               variable_updates="${variable_updates}${variable_name}=${current_sha}"$'\n'
             elif [[ "$current_sha" != "$stored_sha" ]]; then
-              printf "%s changed: %s -> %s\n" "$label" "$stored_sha" "$current_sha"
-              changed="true"
-              variable_updates="${variable_updates}${variable_name}=${current_sha}"$'\n'
-              summary="${summary}${label} ${stored_sha} -> ${current_sha}"$'\n'
+              committed_at="$(commit_committed_at "$repository" "$current_sha")"
+              committed_epoch="$(date -u -d "$committed_at" +%s)"
+
+              if (( committed_epoch > stale_cutoff_epoch )); then
+                printf "%s changed (%s -> %s) but %s was committed at %s, within the %s-minute staleness offset; deferring to the next run.\n" "$label" "$stored_sha" "$current_sha" "$current_sha" "$committed_at" "$STALE_OFFSET_MINUTES"
+              else
+                printf "%s changed: %s -> %s (committed %s)\n" "$label" "$stored_sha" "$current_sha" "$committed_at"
+                changed="true"
+                variable_updates="${variable_updates}${variable_name}=${current_sha}"$'\n'
+                summary="${summary}${label} ${stored_sha} -> ${current_sha}"$'\n'
+              fi
             else
               printf "%s unchanged at %s.\n" "$label" "$current_sha"
             fi
