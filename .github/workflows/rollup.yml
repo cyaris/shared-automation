@@ -261,7 +261,7 @@ jobs:
       run-lint: ${{ inputs.run-lint }}
       run-check: ${{ inputs.run-check }}
       run-build: ${{ inputs.run-build }}
-      allowed-dispatch-actor: ${{ inputs.allowed-dispatch-actor }}
+      allowed-dispatch-actor: ${{ github.actor == 'github-actions[bot]' && 'github-actions[bot]' || inputs.allowed-dispatch-actor }}
     secrets:
       CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -280,7 +280,7 @@ jobs:
 
     steps:
       - name: Validate manual dispatcher
-        if: ${{ github.event_name == 'workflow_dispatch' && github.actor != inputs['allowed-dispatch-actor'] }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.actor != inputs['allowed-dispatch-actor'] && github.actor != 'github-actions[bot]' }}
         env:
           ALLOWED_DISPATCH_ACTOR: ${{ inputs['allowed-dispatch-actor'] }}
         run: |
