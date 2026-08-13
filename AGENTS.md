@@ -21,7 +21,9 @@
 - Keep release boundary decisions in the shared auto-release workflow and release-policy files. Caller repositories should
   not add separate release automation unless the user explicitly asks for a repository-specific exception.
 - Do not move a repository-specific workflow implementation into this repository unless another repository will share the same behavior.
-- Manual `workflow_dispatch` paths must remain restricted to the `cyaris` GitHub actor by default.
+- Manual `workflow_dispatch` paths must remain restricted to the `cyaris` GitHub actor by default. Trusted Rollup
+  dispatches from the repository's upstream-watch workflow may also allow `github-actions[bot]`; do not extend that
+  automation exception to other actors or workflows without a concrete repository-controlled dispatch path.
 
 ## Documentation
 
@@ -60,8 +62,7 @@
 
 - Caller repositories should keep root `Rollup`, `Auto-create dev pull request`, and `Auto release` workflows as thin callers of this repository's reusable workflows whenever those shared workflows cover the needed behavior.
 - Auto-create-dev-pr callers with a repository `RELEASE_TOKEN` secret should pass that secret explicitly to the shared
-  workflow. Use that token for trusted user or agent-authored dev PRs so downstream pull-request checks do not require
-  manual approval solely because the pull request was opened by `github-actions[bot]`.
+  workflow. Use that token for trusted user or agent-authored dev pull requests.
 - Workflows must fail clearly when a requested feature requires credentials, secrets, repository variables, external
   permissions, or paid services that are not configured. Apply this to dry-run modes too: a dry run may avoid external
   writes, but it should still prove that required credentials exist unless the feature is explicitly documented as
@@ -82,9 +83,8 @@
   non-release work unless it changes repository user behavior or a published package/runtime API.
 - For rollup upload callers, pushes or manual dispatches from `main` or `master` should run production uploads with
   unprefixed bundle names. Pushes or manual dispatches from `dev` should run staged uploads with `test_bundle.*` names.
-- Keep non-Rollup `dev` push triggers only for workflows whose purpose is specifically dev-branch automation, such as
-  `auto-create-dev-pr`. CI, build, Pages, and workflow-validation jobs should rely on pull-request checks for
-  dev-to-production changes and production-branch push checks after merge unless a repository documents a specific need.
+- Do not trigger GitHub Actions workflows from pull-request events. Run pre-merge CI, build, Pages, and
+  workflow-validation checks from `dev` pushes, and retain production-branch push checks after merge.
 
 ## Dependency Automation
 

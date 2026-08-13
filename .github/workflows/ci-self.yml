@@ -3,17 +3,8 @@ name: CI
 on:
   push:
     branches:
+      - dev
       - main
-    paths:
-      - ".github/scripts/**"
-      - ".github/workflows/ci-self.yml"
-      - ".github/workflows/ci.yml"
-      - ".gitignore"
-      - ".prettierrc.cjs"
-      - "eslint.config.mjs"
-      - "package-lock.json"
-      - "package.json"
-  pull_request:
     paths:
       - ".github/scripts/**"
       - ".github/workflows/ci-self.yml"

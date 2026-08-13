@@ -131,7 +131,6 @@ jobs:
       ci_local_dependency_repositories: ${{ steps.values.outputs.ci_local_dependency_repositories }}
       dry_run: ${{ steps.values.outputs.dry_run }}
       production: ${{ steps.values.outputs.production }}
-      run_upload: ${{ steps.values.outputs.run_upload }}
       rollup_local_dependency_repositories: ${{ steps.values.outputs.rollup_local_dependency_repositories }}
       svelte_lib_ref: ${{ steps.values.outputs.svelte_lib_ref }}
     steps:
@@ -222,7 +221,6 @@ jobs:
 
           production="false"
           dry_run="$INPUT_DRY_RUN"
-          run_upload="false"
           default_svelte_lib_ref="main"
           svelte_lib_ref="$default_svelte_lib_ref"
 
@@ -230,12 +228,7 @@ jobs:
             production="true"
           fi
 
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            run_upload="true"
-          fi
-
           if [[ "$GITHUB_EVENT_NAME" == "push" && ( "$GITHUB_REF_NAME" == "dev" || "$GITHUB_REF_NAME" == "main" || "$GITHUB_REF_NAME" == "master" ) ]]; then
-            run_upload="true"
             dry_run="false"
           fi
 
@@ -249,7 +242,6 @@ jobs:
             printf "ROLLUP_CI_DEPS\n"
             printf "dry_run=%s\n" "$dry_run"
             printf "production=%s\n" "$production"
-            printf "run_upload=%s\n" "$run_upload"
             printf "rollup_local_dependency_repositories<<ROLLUP_UPLOAD_DEPS\n"
             printf "%s\n" "$resolved_local_dependency_repositories"
             printf "ROLLUP_UPLOAD_DEPS\n"
@@ -278,7 +270,6 @@ jobs:
     needs:
       - node-package-ci
       - resolve-inputs
-    if: needs.resolve-inputs.outputs.run_upload == 'true'
     concurrency:
       group: rollup-upload-${{ github.repository }}-${{ github.ref }}
       cancel-in-progress: false

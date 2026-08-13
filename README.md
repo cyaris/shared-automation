@@ -8,7 +8,8 @@ then call the reusable implementation here with `uses: cyaris/shared-automation/
 
 Manual `workflow_dispatch` runs are guarded by the reusable workflow implementations. By default, they only allow the
 `cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
-release, upload, or deployment work happens.
+release, upload, or deployment work happens. Rollup additionally accepts `github-actions[bot]` so the repository's
+scheduled upstream-watch workflow can dispatch a rebuild when a tracked dependency changes.
 
 Reusable workflow and composite-action contracts use structured inputs such as booleans, paths, refs, file lists, and
 validated spec lines. They avoid caller-provided shell command strings unless a documented repository need cannot be
@@ -107,8 +108,7 @@ Important inputs:
 Optional secret:
 
 - `RELEASE_TOKEN` for trusted user or agent-authored pull requests. When callers pass this secret, the workflow uses it
-  for branch fetches and `gh pr create`; that keeps dev pull-request checks from requiring approval solely because the
-  default `github-actions[bot]` opened the pull request.
+  for branch fetches and `gh pr create`.
 
 ### `.github/workflows/auto-create-dev-pr-self.yml`
 
@@ -183,7 +183,7 @@ the reviewed plan is approved.
 
 ### `.github/workflows/ci-self.yml`
 
-Local workflow for this repository's own `.github/scripts` package. It runs on pushes to `main` and pull requests that
+Local workflow for this repository's own `.github/scripts` package. It runs on pushes to `dev` and `main` that
 touch `.github/scripts/**`, `.github/workflows/ci-self.yml`, `.github/workflows/ci.yml`, `.gitignore`, `.prettierrc.cjs`,
 `eslint.config.mjs`, `package.json`, or `package-lock.json`, plus manual dispatch, then delegates to
 `.github/workflows/ci.yml` with formatting, linting, and `npm test` enabled. `run-check` and `run-build` are disabled
@@ -206,8 +206,8 @@ name: CI
 on:
   push:
     branches:
+      - dev
       - main
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -240,12 +240,13 @@ Optional secret:
 
 Reusable Rollup workflow for Svelte apps that need both shared CI validation and embedded bundle uploads. It resolves
 standard `svelte-lib` refs and local dependency refs to exact commit SHAs at run time, runs the shared CI workflow first,
-then runs the shared rollup upload action only for manual dispatches or pushes to `dev`, `main`, or `master`.
-Caller wrappers still own triggers, manual input declarations, S3 destinations, bundle lists, extra dependency refs, and
+then runs the shared rollup upload action. Caller wrappers must limit triggers to manual dispatches and pushes to `dev`,
+`main`, or `master`; they still own manual input declarations, S3 destinations, bundle lists, extra dependency refs, and
 caller repository variables.
 Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `test_bundle.*` objects.
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
-local wrapper workflow instead.
+local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
+`github-actions[bot]` for repository-controlled dispatches from upstream-watch.
 
 Important inputs:
 
@@ -329,12 +330,8 @@ name: Workflow validation
 on:
   push:
     branches:
+      - dev
       - main
-    paths:
-      - ".github/release-policy.yml"
-      - ".github/workflows/**"
-      - "renovate.json"
-  pull_request:
     paths:
       - ".github/release-policy.yml"
       - ".github/workflows/**"

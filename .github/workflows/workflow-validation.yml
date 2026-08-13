@@ -16,15 +16,8 @@ on:
         default: cyaris
   push:
     branches:
+      - dev
       - main
-    paths:
-      - ".github/actions/**"
-      - ".github/release-policy.yml"
-      - ".github/workflows/**"
-      - "AGENTS.md"
-      - "README.md"
-      - "renovate.json"
-  pull_request:
     paths:
       - ".github/actions/**"
       - ".github/release-policy.yml"
