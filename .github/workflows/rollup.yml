@@ -143,6 +143,7 @@ jobs:
     steps:
       - id: verify-dispatch
         env:
+          ALLOWED_DISPATCH_ACTOR: ${{ inputs.allowed-dispatch-actor }}
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           SOURCE_RUN_ID: ${{ inputs.source-run-id }}
@@ -159,8 +160,11 @@ jobs:
               run_repository="$(jq -r '.repository.full_name // empty' <<< "$run_json")"
 
               # An in-progress status proves the source run has not yet finished, so a completed or
-              # cancelled run's ID cannot be replayed later to forge provenance.
-              if [[ "$run_repository" == "$REPOSITORY" && "$run_path" == ".github/workflows/upstream-watch.yml" && "$run_status" == "in_progress" && "$run_actor" == "github-actions[bot]" ]]; then
+              # cancelled run's ID cannot be replayed later to forge provenance. Scheduled upstream-watch
+              # runs are always attributed to the workflow file's last committer, not github-actions[bot],
+              # so check the source run's actor against the same allowed-dispatch-actor that upstream-watch
+              # itself restricts manual dispatches to.
+              if [[ "$run_repository" == "$REPOSITORY" && "$run_path" == ".github/workflows/upstream-watch.yml" && "$run_status" == "in_progress" && "$run_actor" == "$ALLOWED_DISPATCH_ACTOR" ]]; then
                 verified="true"
               else
                 printf "source-run-id %s did not verify as an in-progress upstream-watch.yml run in %s.\n" "$SOURCE_RUN_ID" "$REPOSITORY" >&2
