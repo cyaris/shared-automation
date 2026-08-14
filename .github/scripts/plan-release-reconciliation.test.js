@@ -133,6 +133,18 @@ test("validateActions rejects an update action that would move an existing tag's
   assert.throws(() => validateActions(actions, context), /cannot move v1\.0\.0 from sha-a to sha-b/)
 })
 
+test("validateActions accepts an update action for a legacy tag that predates the v prefix convention", () => {
+  const actions = normalizeActions([
+    { action: "update", tag: "0.0.1", target_sha: "sha-a", title: "Title", notes: "Notes", reason: "Reason" }
+  ])
+  const context = baseContext({ existingReleases: [{ tag: "0.0.1", targetSha: "sha-a" }] })
+
+  const validated = validateActions(actions, context)
+
+  assert.equal(validated[0].action, "update")
+  assert.equal(validated[0].tag, "0.0.1")
+})
+
 test("validateActions rejects an update action for a tag with no matching existing release", () => {
   const actions = normalizeActions([
     { action: "update", tag: "v9.0.0", target_sha: "sha-a", title: "Title", notes: "Notes", reason: "Reason" }
