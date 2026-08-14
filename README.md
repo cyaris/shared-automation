@@ -9,7 +9,9 @@ then call the reusable implementation here with `uses: cyaris/shared-automation/
 Manual `workflow_dispatch` runs are guarded by the reusable workflow implementations. By default, they only allow the
 `cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
 release, upload, or deployment work happens. Rollup additionally accepts `github-actions[bot]` so the repository's
-scheduled upstream-watch workflow can dispatch a rebuild when a tracked dependency changes.
+scheduled upstream-watch workflow can dispatch a rebuild when a tracked dependency changes, but only after verifying
+through the GitHub API that the dispatch actually came from an in-progress `upstream-watch.yml` run in the same
+repository.
 
 Reusable workflow and composite-action contracts use structured inputs such as booleans, paths, refs, file lists, and
 validated spec lines. They avoid caller-provided shell command strings unless a documented repository need cannot be
@@ -246,7 +248,8 @@ caller repository variables.
 Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `test_bundle.*` objects.
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
-`github-actions[bot]` for repository-controlled dispatches from upstream-watch.
+`github-actions[bot]` for repository-controlled dispatches from upstream-watch, verified by looking up `source-run-id`
+through the GitHub API rather than trusting the actor name alone.
 
 Important inputs:
 
@@ -255,6 +258,12 @@ Important inputs:
   `manual-dry-run`, `sync-dist-extras`, `cache-control`, `metadata-refresh-files`, and `svelte-lib-repository`
 - Shared dependency input: `local-dependency-repositories` for dependencies used by both CI and upload
 - `allowed-dispatch-actor`, defaulting to `cyaris`
+- `source-run-id`, populated automatically by upstream-watch's dispatch call; not intended for manual use
+
+The `github-actions[bot]` dispatch exception only applies when `source-run-id` resolves, through the GitHub API, to an
+in-progress `upstream-watch.yml` run in the same repository; this requires the caller's job to grant `actions: read`
+in addition to `contents: read` and `id-token: write`, and the caller's `workflow_dispatch` inputs to declare and
+forward `source-run-id`. Callers that only dispatch manually (`cyaris`) do not need either change.
 
 Rollup callers use branch refs such as `main` for first-party local dependencies by default. The workflow resolves those
 refs once to the latest commit SHA before checking out dependencies. Dependencies listed in
@@ -283,7 +292,8 @@ Reusable daily-cron watcher for repositories whose local `file:` dependencies (`
 declared via `local-dependency-repositories`) can change without the caller repository itself getting a new commit. It
 resolves the same upstream refs `rollup.yml` resolves, compares each one against a repository variable recording the
 last-seen commit SHA, and when any upstream dependency has moved, dispatches the caller's own `Rollup` workflow via
-`workflow_dispatch` so the caller rebuilds and redeploys with current upstream code. The `svelte-lib` dependency is
+`workflow_dispatch`, passing its own run ID as `source-run-id` so Rollup can verify the dispatch through the GitHub API,
+so the caller rebuilds and redeploys with current upstream code. The `svelte-lib` dependency is
 always compared against `main`. Each `local-dependency-repositories` entry must track `main`, `master`, or a pinned
 commit SHA unless `allow-nonproduction-refs` is enabled, since a match dispatches a live Rollup redeploy and a moving
 nonproduction branch would otherwise do that on unrelated activity; there is no per-pull-request tracking.
