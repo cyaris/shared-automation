@@ -236,10 +236,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           ROLLUP_WORKFLOW_FILE: ${{ inputs.rollup-workflow-file }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
 
-          gh workflow run "$ROLLUP_WORKFLOW_FILE" -R "$REPOSITORY" --ref "$DISPATCH_REF"
+          gh workflow run "$ROLLUP_WORKFLOW_FILE" -R "$REPOSITORY" --ref "$DISPATCH_REF" -f source-run-id="$SOURCE_RUN_ID"
 
       - name: Record latest upstream refs
         if: steps.check.outputs.variable_updates != ''

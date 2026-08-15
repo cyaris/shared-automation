@@ -119,9 +119,6 @@ function validateActions(normalizedActions, context) {
         action.reason = `Existing release updates are disabled. ${action.reason}`.trim()
         continue
       }
-      if (!TAG_PATTERN.test(action.tag) || action.tag.includes("..")) {
-        throw new Error(`Invalid existing release tag for update action: ${action.tag}`)
-      }
       if (!action.title) {
         throw new Error(`Release title cannot be empty for update action ${action.tag}`)
       }
