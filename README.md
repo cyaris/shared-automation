@@ -261,9 +261,11 @@ Important inputs:
 - `source-run-id`, populated automatically by upstream-watch's dispatch call; not intended for manual use
 
 The `github-actions[bot]` dispatch exception only applies when `source-run-id` resolves, through the GitHub API, to an
-in-progress `upstream-watch.yml` run in the same repository; this requires the caller's job to grant `actions: read`
-in addition to `contents: read` and `id-token: write`, and the caller's `workflow_dispatch` inputs to declare and
-forward `source-run-id`. Callers that only dispatch manually (`cyaris`) do not need either change.
+authorized `upstream-watch.yml` run in the same repository and the Rollup run's creation time falls within the source
+run's lifetime. Checking the creation time preserves replay protection even when upstream-watch finishes before Rollup
+gets a runner. This requires the caller's job to grant `actions: read` in addition to `contents: read` and
+`id-token: write`, and the caller's `workflow_dispatch` inputs to declare and forward `source-run-id`. Callers that only
+dispatch manually (`cyaris`) do not need either change.
 
 Rollup callers use branch refs such as `main` for first-party local dependencies by default. The workflow resolves those
 refs once to the latest commit SHA before checking out dependencies. Dependencies listed in
