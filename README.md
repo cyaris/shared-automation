@@ -10,8 +10,9 @@ Manual `workflow_dispatch` runs are guarded by the reusable workflow implementat
 `cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
 release, upload, or deployment work happens. Rollup additionally accepts `github-actions[bot]` so the repository's
 scheduled upstream-watch workflow can dispatch a rebuild when a tracked dependency changes, but only after verifying
-through the GitHub API that the dispatch actually came from an in-progress `upstream-watch.yml` run in the same
-repository.
+through the GitHub API that the supplied run reference is an authorized `upstream-watch.yml` run in the same
+repository that was active when the Rollup run was created; this is time-bounded authorization of that run reference,
+not cryptographic proof that the referenced run issued the dispatch.
 
 Reusable workflow and composite-action contracts use structured inputs such as booleans, paths, refs, file lists, and
 validated spec lines. They avoid caller-provided shell command strings unless a documented repository need cannot be
@@ -261,9 +262,13 @@ Important inputs:
 - `source-run-id`, populated automatically by upstream-watch's dispatch call; not intended for manual use
 
 The `github-actions[bot]` dispatch exception only applies when `source-run-id` resolves, through the GitHub API, to an
-in-progress `upstream-watch.yml` run in the same repository; this requires the caller's job to grant `actions: read`
-in addition to `contents: read` and `id-token: write`, and the caller's `workflow_dispatch` inputs to declare and
-forward `source-run-id`. Callers that only dispatch manually (`cyaris`) do not need either change.
+authorized `upstream-watch.yml` run in the same repository and the Rollup run's creation time falls within the source
+run's lifetime. `source-run-id` is caller-supplied input, so this is time-bounded authorization of a legitimate run
+reference, not cryptographic proof that the referenced run issued the dispatch; checking the creation time only limits
+how long a valid run ID stays usable, even when upstream-watch finishes before Rollup gets a runner. This requires the
+caller's job to grant `actions: read` in addition to `contents: read` and `id-token: write`, and the caller's
+`workflow_dispatch` inputs to declare and forward `source-run-id`. Callers that only dispatch manually (`cyaris`) do not
+need either change.
 
 Rollup callers use branch refs such as `main` for first-party local dependencies by default. The workflow resolves those
 refs once to the latest commit SHA before checking out dependencies. Dependencies listed in

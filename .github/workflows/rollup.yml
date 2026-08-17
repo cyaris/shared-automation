@@ -144,6 +144,7 @@ jobs:
       - id: verify-dispatch
         env:
           ALLOWED_DISPATCH_ACTOR: ${{ inputs.allowed-dispatch-actor }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           SOURCE_RUN_ID: ${{ inputs.source-run-id }}
@@ -152,25 +153,49 @@ jobs:
 
           verified="false"
 
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_ACTOR" == "github-actions[bot]" && -n "$SOURCE_RUN_ID" ]]; then
-            if run_json="$(gh api "repos/${REPOSITORY}/actions/runs/${SOURCE_RUN_ID}" 2>/dev/null)"; then
-              run_path="$(jq -r '.path // empty' <<< "$run_json")"
-              run_status="$(jq -r '.status // empty' <<< "$run_json")"
-              run_actor="$(jq -r '.actor.login // empty' <<< "$run_json")"
-              run_repository="$(jq -r '.repository.full_name // empty' <<< "$run_json")"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_ACTOR" == "github-actions[bot]" ]]; then
+            if [[ -z "$SOURCE_RUN_ID" ]]; then
+              printf "Automated Rollup dispatches require source-run-id.\n" >&2
+              exit 1
+            fi
 
-              # An in-progress status proves the source run has not yet finished, so a completed or
-              # cancelled run's ID cannot be replayed later to forge provenance. Scheduled upstream-watch
-              # runs are always attributed to the workflow file's last committer, not github-actions[bot],
-              # so check the source run's actor against the same allowed-dispatch-actor that upstream-watch
-              # itself restricts manual dispatches to.
-              if [[ "$run_repository" == "$REPOSITORY" && "$run_path" == ".github/workflows/upstream-watch.yml" && "$run_status" == "in_progress" && "$run_actor" == "$ALLOWED_DISPATCH_ACTOR" ]]; then
-                verified="true"
-              else
-                printf "source-run-id %s did not verify as an in-progress upstream-watch.yml run in %s.\n" "$SOURCE_RUN_ID" "$REPOSITORY" >&2
-              fi
-            else
+            if ! source_run_json="$(gh api "repos/${REPOSITORY}/actions/runs/${SOURCE_RUN_ID}" 2>/dev/null)"; then
               printf "Failed to look up source-run-id %s in %s.\n" "$SOURCE_RUN_ID" "$REPOSITORY" >&2
+              exit 1
+            fi
+
+            if ! current_run_json="$(gh api "repos/${REPOSITORY}/actions/runs/${CURRENT_RUN_ID}" 2>/dev/null)"; then
+              printf "Failed to look up current run %s in %s.\n" "$CURRENT_RUN_ID" "$REPOSITORY" >&2
+              exit 1
+            fi
+
+            source_run_actor="$(jq -r '.actor.login // empty' <<< "$source_run_json")"
+            source_run_event="$(jq -r '.event // empty' <<< "$source_run_json")"
+            source_run_path="$(jq -r '.path // empty' <<< "$source_run_json")"
+            source_run_repository="$(jq -r '.repository.full_name // empty' <<< "$source_run_json")"
+            source_run_started_at="$(jq -r '.run_started_at // .created_at // empty' <<< "$source_run_json")"
+            source_run_status="$(jq -r '.status // empty' <<< "$source_run_json")"
+            source_run_updated_at="$(jq -r '.updated_at // empty' <<< "$source_run_json")"
+            current_run_created_at="$(jq -r '.created_at // empty' <<< "$current_run_json")"
+
+            # The source may finish before this job gets a runner. Bind the current run's creation
+            # time to the source run's lifetime so completed source IDs cannot be replayed later.
+            dispatch_during_source_run="false"
+            if jq -en \
+              --arg created_at "$current_run_created_at" \
+              --arg source_started_at "$source_run_started_at" \
+              --arg source_status "$source_run_status" \
+              --arg source_updated_at "$source_run_updated_at" \
+              '$source_started_at != "" and $created_at != "" and $created_at >= $source_started_at and ($source_status == "in_progress" or ($source_updated_at != "" and $created_at <= $source_updated_at))' \
+              >/dev/null; then
+              dispatch_during_source_run="true"
+            fi
+
+            if [[ "$source_run_repository" == "$REPOSITORY" && "$source_run_path" == ".github/workflows/upstream-watch.yml" && ( "$source_run_event" == "schedule" || "$source_run_event" == "workflow_dispatch" ) && "$source_run_actor" == "$ALLOWED_DISPATCH_ACTOR" && "$dispatch_during_source_run" == "true" ]]; then
+              verified="true"
+            else
+              printf "source-run-id %s did not verify as an authorized upstream-watch.yml run that was active when Rollup run %s was created.\n" "$SOURCE_RUN_ID" "$CURRENT_RUN_ID" >&2
+              exit 1
             fi
           fi
 

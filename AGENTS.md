@@ -2,9 +2,9 @@
 
 ## Scope And Inheritance
 
-- Repositories that call workflows or actions from `cyaris/shared-automation` may use this `AGENTS.md` as the source of truth for shared GitHub Actions, reusable workflow wrapper, release-policy, dispatch, and automation documentation conventions.
-- Treat these shared rules as scoped to automation behavior. Project-specific build commands, dependency refs, bundle files, S3 prefixes, release naming, milestone wording, deployment targets, and documentation style rules belong in the caller repository's own `AGENTS.md` or `.github/release-policy.yml`.
-- When a caller repository inherits these rules, keep a local `AGENTS.md` note that points back to `../shared-automation/AGENTS.md`, then list only the caller-specific automation details that differ from the shared defaults.
+- Repositories that call workflows or actions from `cyaris/shared-automation` may use this `AGENTS.md` as the source of truth for shared GitHub Actions, reusable workflow wrapper, release-policy, dispatch, automation documentation, and general README/Markdown documentation-style conventions.
+- Treat the automation rules in this file as scoped to automation behavior, and the general README/Markdown style rules in the Documentation section as scoped to any caller repository's README and Markdown documentation. Project-specific build commands, dependency refs, bundle files, S3 prefixes, release naming, milestone wording, deployment targets, and project-specific documentation content belong in the caller repository's own `AGENTS.md` or `.github/release-policy.yml`.
+- When a caller repository inherits these rules, keep a local `AGENTS.md` note that points back to `../shared-automation/AGENTS.md` for both automation conventions and README/documentation-style conventions, then list only the caller-specific automation and documentation details that differ from the shared defaults.
 
 ## Shared Workflow Implementations
 
@@ -23,9 +23,12 @@
 - Do not move a repository-specific workflow implementation into this repository unless another repository will share the same behavior.
 - Manual `workflow_dispatch` paths must remain restricted to the `cyaris` GitHub actor by default. Trusted Rollup
   dispatches from the repository's upstream-watch workflow may also allow `github-actions[bot]`, gated on Rollup
-  verifying via the GitHub API that the supplied `source-run-id` is an in-progress `upstream-watch.yml` run in the same
-  repository; an actor check alone cannot prove which workflow triggered a `github-actions[bot]` dispatch. Do not extend
-  that automation exception to other actors or workflows without an equivalent verified provenance signal.
+  verifying via the GitHub API that the supplied `source-run-id` references an authorized `upstream-watch.yml` run in
+  the same repository that was active when the Rollup run was created. This is time-bounded authorization of a
+  legitimate run ID, not verified provenance: `source-run-id` is caller-supplied input, so it does not cryptographically
+  prove which workflow actually issued the dispatch. Do not extend that automation exception to other actors or
+  workflows, and do not grant `actions: write` to additional workflows in this repository, without first closing that
+  gap (for example, with a `workflow_run` trigger).
 
 ## Documentation
 
@@ -35,6 +38,37 @@
   migration-era notes, deprecated-option explanations, old fallback paths, and historical caveats once they no longer
   affect how someone uses, maintains, deploys, or releases the project. When a state change makes a requirement obsolete,
   update the affected docs and configuration in that same change.
+- Keep README link behavior intentional and consistent. Use standard Markdown links by default, and use HTML anchors
+  with `target="_blank"` and `rel="noopener noreferrer"` only when links should explicitly open in a new tab.
+- Prefer bullets and subbullets over inline listed-out prose in README and Markdown documentation when they make
+  concrete technical lists easier to scan, especially files, paths, options, flags, configuration values, table names,
+  column names, commands, and metrics. Keep short phrase lists in prose when bullets would make the text feel
+  fragmented, and keep tables when they make dense reference data easier to compare.
+- Do not use bullets solely to separate README command examples or other code-block sections. Introduce each code block
+  with a short prose sentence instead.
+- Do not place separate bullet groups directly next to each other when they document different concepts, because
+  Markdown can render them as one list. Use prose, a table, or an explicit subsection label to separate the concepts.
+- Keep each README bullet list focused on one kind of item. If a bullet stands out as metadata, a context note, an
+  example, an identifier, or a behavior note rather than a peer of the surrounding bullets, move it into
+  prose, a table, a new subsection, or a clearly labeled subbullet group.
+- When README bullet items are sentence fragments, omit trailing periods. Keep periods for bullets that are complete
+  sentences or contain multiple sentences.
+- Avoid starting README bullets with ambiguous pronouns such as `it`, `this`, or `these` unless the noun is explicit in
+  the same bullet. Repeat the noun when that makes the bullet clearer.
+- Avoid vague README verbs such as `use`, `provide`, `support`, or `available` when the relationship can be named more
+  directly. Prefer concrete wording that identifies the field, flag, table, file path, setting, destination, or UI
+  behavior.
+- When documenting multiple README tables, files, or generated outputs, describe each item separately when a shared
+  description would become vague or hide meaningful differences.
+- Use prose instead of a bullet list when a section would contain only one bullet. Prefer prose over subbullets when a
+  nested list would have only two items, unless the pair needs extra visual separation to avoid ambiguity.
+- When an example supports an existing README bullet, make the example a subbullet under that point even when there is
+  only one example. Use `Example:` for one example and `Examples:` for multiple examples.
+- Let table-of-contents nesting reflect the document structure even when a section has only two children.
+- Keep documentation style guidance in AGENTS.md instead of the README.
+- Keep future maintainer instructions in AGENTS.md instead of the README. The README should describe project behavior,
+  commands, outputs, and user-facing effects rather than telling future editors what they should do.
+- In Markdown files, always format the literal as `null`.
 - Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
 - Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
 - Keep private action and dependency access requirements documented in `README.md`.
