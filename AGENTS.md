@@ -23,10 +23,12 @@
 - Do not move a repository-specific workflow implementation into this repository unless another repository will share the same behavior.
 - Manual `workflow_dispatch` paths must remain restricted to the `cyaris` GitHub actor by default. Trusted Rollup
   dispatches from the repository's upstream-watch workflow may also allow `github-actions[bot]`, gated on Rollup
-  verifying via the GitHub API that the supplied `source-run-id` is an authorized `upstream-watch.yml` run in the same
-  repository and that the Rollup run was created during the source run's lifetime; an actor check alone cannot prove
-  which workflow triggered a `github-actions[bot]` dispatch. Do not extend that automation exception to other actors or
-  workflows without an equivalent verified provenance signal.
+  verifying via the GitHub API that the supplied `source-run-id` references an authorized `upstream-watch.yml` run in
+  the same repository that was active when the Rollup run was created. This is time-bounded authorization of a
+  legitimate run ID, not verified provenance: `source-run-id` is caller-supplied input, so it does not cryptographically
+  prove which workflow actually issued the dispatch. Do not extend that automation exception to other actors or
+  workflows, and do not grant `actions: write` to additional workflows in this repository, without first closing that
+  gap (for example, with a `workflow_run` trigger).
 
 ## Documentation
 
