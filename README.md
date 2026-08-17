@@ -10,8 +10,8 @@ Manual `workflow_dispatch` runs are guarded by the reusable workflow implementat
 `cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
 release, upload, or deployment work happens. Rollup additionally accepts `github-actions[bot]` so the repository's
 scheduled upstream-watch workflow can dispatch a rebuild when a tracked dependency changes, but only after verifying
-through the GitHub API that the dispatch actually came from an in-progress `upstream-watch.yml` run in the same
-repository.
+through the GitHub API that the dispatch actually came from an authorized `upstream-watch.yml` run in the same
+repository and that the Rollup run was created during that source run's lifetime.
 
 Reusable workflow and composite-action contracts use structured inputs such as booleans, paths, refs, file lists, and
 validated spec lines. They avoid caller-provided shell command strings unless a documented repository need cannot be
