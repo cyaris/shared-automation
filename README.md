@@ -331,10 +331,13 @@ how long a valid run ID stays usable, even when upstream-watch finishes before R
 
 Automated dispatch requires:
 
-- The upstream-watch caller's job permissions: `actions: write` (for the `gh workflow run` dispatch call) and
-  `contents: read`
-- The Rollup caller's job permissions: `actions: read` (so `resolve-inputs` can look up and verify `source-run-id`),
-  `contents: read`, and `id-token: write` only when using `aws-role-to-assume` instead of static AWS credentials
+- The upstream-watch caller's job permissions:
+  - `actions: write`, for the `gh workflow run` dispatch call
+  - `contents: read`
+- The Rollup caller's job permissions:
+  - `actions: read`, so `resolve-inputs` can look up and verify `source-run-id`
+  - `contents: read`
+  - `id-token: write`, only when using `aws-role-to-assume` instead of static AWS credentials
 - A caller `workflow_dispatch` input that declares and forwards `source-run-id`
 
 Callers that only dispatch manually (`cyaris`) need neither change.
@@ -347,10 +350,11 @@ code while preserving exact commit evidence in the run.
 
 The composite upload implementation lives at `.github/actions/rollup-upload/action.yml`. AWS OIDC is the preferred
 authentication path. Rollup caller repositories should store the role ARN in a repository variable such as
-`AWS_ROLLUP_UPLOAD_ROLE_ARN`, pass it to `aws-role-to-assume`, and grant only `contents: read` and `id-token: write` on
-the job that calls `.github/workflows/rollup.yml`. If `aws-role-to-assume` is blank, the action falls back to static AWS
-access-key secrets. Dry runs validate that one of those credential paths exists, because a dry run should prove the
-configured deployment credentials are available even though it does not write S3 objects.
+`AWS_ROLLUP_UPLOAD_ROLE_ARN`, pass it to `aws-role-to-assume`, and grant `actions: read` and `contents: read` on the job
+that calls `.github/workflows/rollup.yml`; grant `id-token: write` only when using `aws-role-to-assume`. If
+`aws-role-to-assume` is blank, the action falls back to static AWS access-key secrets. Dry runs validate that one of
+those credential paths exists, because a dry run should prove the configured deployment credentials are available even
+though it does not write S3 objects.
 
 Optional secrets:
 
