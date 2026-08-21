@@ -331,10 +331,10 @@ how long a valid run ID stays usable, even when upstream-watch finishes before R
 
 Automated dispatch requires:
 
-- Caller job permissions:
-  - `actions: read`
-  - `contents: read`
-  - `id-token: write`
+- The upstream-watch caller's job permissions: `actions: write` (for the `gh workflow run` dispatch call) and
+  `contents: read`
+- The Rollup caller's job permissions: `actions: read` (so `resolve-inputs` can look up and verify `source-run-id`),
+  `contents: read`, and `id-token: write` only when using `aws-role-to-assume` instead of static AWS credentials
 - A caller `workflow_dispatch` input that declares and forwards `source-run-id`
 
 Callers that only dispatch manually (`cyaris`) need neither change.
