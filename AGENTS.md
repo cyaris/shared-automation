@@ -2,11 +2,11 @@
 
 ## Scope And Inheritance
 
-- Repositories that call workflows or actions from `cyaris/shared-automation` may use this `AGENTS.md` as the source of truth for shared GitHub Actions, reusable workflow wrapper, release-policy, dispatch, automation documentation, and general README/Markdown documentation-style conventions.
+- Repositories that call workflows or actions from `cyaris/shared-automation` inherit this `AGENTS.md` as the source of truth for shared GitHub Actions, reusable workflow wrappers, release policy, dispatch, automation documentation, and general README/Markdown documentation style.
 - Treat the automation rules in this file as scoped to automation behavior, and the general README/Markdown style rules in the Documentation section as scoped to any caller repository's README and Markdown documentation. Project-specific build commands, dependency refs, bundle files, S3 prefixes, release naming, milestone wording, deployment targets, and project-specific documentation content belong in the caller repository's own `AGENTS.md` or `.github/release-policy.yml`.
 - When a caller repository inherits these rules, keep a local `AGENTS.md` note that points back to `../shared-automation/AGENTS.md` for both automation conventions and README/documentation-style conventions, then list only the caller-specific automation and documentation details that differ from the shared defaults.
 
-## Shared Workflow Implementations
+## Workflow Ownership And Caller Expectations
 
 - Keep reusable workflow implementations in `.github/workflows`.
 - Keep composite GitHub Actions in `.github/actions`.
@@ -20,11 +20,13 @@
 - Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
 - Keep release boundary decisions in the shared auto-release workflow and release-policy files. Caller repositories should
   not add separate release automation unless the user explicitly asks for a repository-specific exception.
+- Keep root `Rollup`, `Auto-create dev pull request`, and `Auto release` workflows as thin callers whenever the shared
+  workflows cover the needed behavior.
 - Do not move a repository-specific workflow implementation into this repository unless another repository will share the same behavior.
 - Manual `workflow_dispatch` paths must remain restricted to the `cyaris` GitHub actor by default. Trusted Rollup
   dispatches from the repository's upstream-watch workflow may also allow `github-actions[bot]`, gated on Rollup
   verifying via the GitHub API that the supplied `source-run-id` references an authorized `upstream-watch.yml` run in
-  the same repository that was active when the Rollup run was created. This is time-bounded authorization of a
+  the same repository that was active when GitHub created the Rollup run. This is time-bounded authorization of a
   legitimate run ID, not verified provenance: `source-run-id` is caller-supplied input, so it does not cryptographically
   prove which workflow actually issued the dispatch. Do not extend that automation exception to other actors or
   workflows, and do not grant `actions: write` to additional workflows in this repository, without first closing that
@@ -38,12 +40,16 @@
   migration-era notes, deprecated-option explanations, old fallback paths, and historical caveats once they no longer
   affect how someone uses, maintains, deploys, or releases the project. When a state change makes a requirement obsolete,
   update the affected docs and configuration in that same change.
+- Do not add repository-owned `CHANGELOG.md` files. Keep durable current behavior in README/AGENTS documentation and
+  publish milestone history through GitHub release notes.
 - Keep README link behavior intentional and consistent. Use standard Markdown links by default, and use HTML anchors
   with `target="_blank"` and `rel="noopener noreferrer"` only when links should explicitly open in a new tab.
-- Prefer bullets and subbullets over inline listed-out prose in README and Markdown documentation when they make
-  concrete technical lists easier to scan, especially files, paths, options, flags, configuration values, table names,
-  column names, commands, and metrics. Keep short phrase lists in prose when bullets would make the text feel
-  fragmented, and keep tables when they make dense reference data easier to compare.
+- In README files and user-facing technical Markdown documentation, use bullets, subbullets, or a compact table whenever a
+  sentence or paragraph enumerates three or more peer technical items, including files, paths, commands, flags, fields,
+  tables, outputs, steps, requirements, metrics, dependencies, or triggers. Do not leave a concrete inventory as
+  comma-separated prose merely because each item is short. Keep one item or a genuinely inseparable two-item phrase in
+  prose. When aligning a README with these rules, audit existing touched sections for dense inline inventories instead
+  of applying the rule only to new text.
 - Do not use bullets solely to separate README command examples or other code-block sections. Introduce each code block
   with a short prose sentence instead.
 - Do not place separate bullet groups directly next to each other when they document different concepts, because
@@ -58,6 +64,9 @@
 - Avoid vague README verbs such as `use`, `provide`, `support`, or `available` when the relationship can be named more
   directly. Prefer concrete wording that identifies the field, flag, table, file path, setting, destination, or UI
   behavior.
+- Prefer active wording when it identifies the actor or operation more clearly, especially for ownership, workflow
+  actions, requirements, generated outputs, and failure behavior. Keep passive or state-oriented wording when the actor
+  is unknown, irrelevant, or less important than the resulting state; do not perform mechanical voice rewrites.
 - When documenting multiple README tables, files, or generated outputs, describe each item separately when a shared
   description would become vague or hide meaningful differences.
 - Use prose instead of a bullet list when a section would contain only one bullet. Prefer prose over subbullets when a
@@ -72,31 +81,18 @@
 - Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
 - Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
 - Keep private action and dependency access requirements documented in `README.md`.
-- Keep README Markdown tables compact in source. Do not pad table cells or separator rows solely to align columns;
-  preserve only required alignment markers such as `---:`, `:---`, or `:---:`.
+- Format Markdown pipe tables with exactly one space inside each cell boundary, such as `| Prop | Behavior |` and
+  `| --- | ---: |`. Start and end each row with `|`, without leading or trailing whitespace outside those pipes, and do
+  not add extra padding solely to align columns. Preserve required alignment markers such as `---:`, `:---`, and
+  `:---:`.
 - Downstream README files should link to this repository's workflow descriptions instead of repeating shared behavior.
-  Keep repo-specific details downstream, such as trigger branches, working directories, S3 prefixes, bundle file lists,
-  dependency refs, skipped commands, and required repository variables or secrets.
-- For auto-create-dev-pr caller README sections, describe the local trigger branch and target branch, then link to the
-  shared workflow description for behavior, inputs, and secrets.
-- For auto-release caller README sections, describe that the local workflow is manual-only and any repository-specific
-  release policy or default branch behavior, then link to the shared workflow description for reconciliation behavior,
-  inputs, and secrets.
-- For CI caller README sections, describe local triggers, working directories, skipped commands, and dependency ref
-  fallbacks, then link to the shared workflow description for validation behavior, inputs, and secrets.
+  For each local wrapper, document only the applicable local trigger and branch behavior, working directory, skipped
+  commands, destination or S3 prefix, bundle files and naming, dependency refs, policy overrides, and required local
+  variables or secrets. Then link to the shared workflow description for common behavior, inputs, and secrets.
 - Keep reusable workflow and composite-action contracts on structured inputs such as booleans, paths, refs, file lists,
   and validated spec lines. Do not expose arbitrary shell command strings as caller inputs unless a documented caller
   need cannot be expressed through fixed package scripts or structured configuration; keep shared CI validation on fixed
   npm scripts controlled by boolean inputs.
-- For rollup caller README sections, describe the local CI triggers, upload trigger, S3 destination, bundle files,
-  production or staged naming, and repository-specific dependency refs, then link to the shared workflow description for
-  combined CI and upload behavior, inputs, and secrets.
-- For workflow-validation caller README sections, describe that the local wrapper validates repository-owned workflow
-  logic, then link to the shared workflow description for actionlint, JSON config, and zizmor behavior.
-
-## Caller Workflow Expectations
-
-- Caller repositories should keep root `Rollup`, `Auto-create dev pull request`, and `Auto release` workflows as thin callers of this repository's reusable workflows whenever those shared workflows cover the needed behavior.
 - Auto-create-dev-pr callers with a repository `RELEASE_TOKEN` secret should pass that secret explicitly to the shared
   workflow. Use that token for trusted user or agent-authored dev pull requests.
 - Workflows must fail clearly when a requested feature requires credentials, secrets, repository variables, external
@@ -121,6 +117,21 @@
   unprefixed bundle names. Pushes or manual dispatches from `dev` should run staged uploads with `test_bundle.*` names.
 - Do not trigger GitHub Actions workflows from pull-request events. Run pre-merge CI, build, Pages, and
   workflow-validation checks from `dev` pushes, and retain production-branch push checks after merge.
+
+## Release Management
+
+- Use the default policy in `.github/release-policy.yml` unless a caller has a durable project-specific override in its
+  own `.github/release-policy.yml`. Keep version and title formats in policy files rather than duplicating them in
+  `AGENTS.md`.
+- Evaluate whether accumulated changes form a meaningful release milestone. Substantial user-facing features,
+  architecture changes, important reliability, security, accessibility, performance, or compatibility improvements,
+  and coherent groups of material changes may warrant a release. Routine maintenance, formatting, minor refactors,
+  isolated dependency updates, and small fixes normally do not.
+- When a release may be warranted, explain the milestone, suggest a policy-consistent title and tag, summarize release
+  notes and migration concerns, and recommend full release, prerelease, or draft status.
+- Treat work on PR or development branches as a release candidate. The final tag should normally point to the merge
+  commit on `main` or `master` unless the user explicitly approves another branch.
+- Do not create, rename, move, or delete tags or publish a GitHub release unless the user explicitly requests it.
 
 ## Dependency Automation
 

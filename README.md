@@ -6,12 +6,12 @@ This repository is the neutral home for reusable workflow implementations that s
 library repository. Downstream repositories should keep thin local wrapper workflows that define when the workflow runs,
 then call the reusable implementation here with `uses: cyaris/shared-automation/.github/workflows/<workflow>.yml@main`.
 
-Manual `workflow_dispatch` runs are guarded by the reusable workflow implementations. By default, they only allow the
+The reusable workflow implementations guard manual `workflow_dispatch` runs. By default, they only allow the
 `cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
 release, upload, or deployment work happens. Rollup additionally accepts `github-actions[bot]` so the repository's
 scheduled upstream-watch workflow can dispatch a rebuild when a tracked dependency changes, but only after verifying
 through the GitHub API that the supplied run reference is an authorized `upstream-watch.yml` run in the same
-repository that was active when the Rollup run was created; this is time-bounded authorization of that run reference,
+repository that was active when GitHub created the Rollup run; this is time-bounded authorization of that run reference,
 not cryptographic proof that the referenced run issued the dispatch.
 
 Reusable workflow and composite-action contracts use structured inputs such as booleans, paths, refs, file lists, and
@@ -21,15 +21,19 @@ expressed through fixed package scripts or structured configuration.
 ## Node Tooling
 
 The root `package.json` covers the Node scripts under `.github/scripts/` that back `.github/workflows/auto-release.yml`.
-`npm run format`, `npm run format:check`, `npm run lint`, and `npm test` apply Prettier, ESLint, and `node --test`
-to those files; `.prettierrc.cjs` and `eslint.config.mjs` hold the formatting and lint rules. `.github/workflows/ci-self.yml`
-runs `npm run format:check`, `npm run lint`, and `npm test` on changes to that package.
+
+- `npm run format` applies Prettier
+- `npm run format:check` checks Prettier formatting
+- `npm run lint` applies ESLint
+- `npm test` runs the `node --test` suites
+- `.prettierrc.cjs` and `eslint.config.mjs` define formatting and lint rules
+- `.github/workflows/ci-self.yml` runs the format check, lint, and tests when the package changes
 
 ## Renovate
 
-Renovate dependency automation is prepared through the shared preset in `default.json`. Participating repositories keep
-small local `renovate.json` files that extend `github>cyaris/shared-automation`, so common grouping, scheduling, labels,
-and ignored generated paths stay centralized while repository-local overrides remain possible.
+The shared preset in `default.json` prepares Renovate dependency automation. Participating repositories keep small local
+`renovate.json` files that extend `github>cyaris/shared-automation`, so the preset centralizes common grouping,
+scheduling, labels, and ignored generated paths while allowing repository-local overrides.
 
 The shared preset covers:
 
@@ -38,9 +42,14 @@ The shared preset covers:
 - lockfile maintenance before 6am on Mondays in `America/Chicago`
 - grouped minor and patch npm updates for production and development dependencies
 - grouped GitHub Actions updates, including `cyaris/shared-automation` workflow references
-- generated and vendored path exclusions for `node_modules`, `_site`, `.svelte-kit`, `dist`, and `build`
+- generated and vendored path exclusions
+  - `node_modules`
+  - `_site`
+  - `.svelte-kit`
+  - `dist`
+  - `build`
 - the `actionlint` and `zizmor` versions pinned in `.github/workflows/workflow-validation.yml`, tracked through custom
-  regex managers since those tools are installed by shell commands rather than a package manifest
+  regex managers because shell commands install those tools instead of a package manifest
 
 Third-party GitHub Actions should use hash pins with readable major-version comments, then rely on Renovate for future
 updates. First-party reusable workflow callers keep `cyaris/shared-automation` refs on `main` so each run uses the latest
@@ -52,7 +61,7 @@ adds an explicit local automerge policy later.
 
 Remote setup is still required before Renovate runs. Install the Renovate GitHub App for each participating repository,
 and grant the app access to `cyaris/shared-automation` so it can resolve the shared preset. For private repositories,
-the app must be allowed to read both the target repository and this preset repository.
+grant the app read access to both the target repository and this preset repository.
 
 ## Branch Model
 
@@ -127,12 +136,12 @@ Local workflow for this repository. It runs from manual dispatch only, then dele
 
 Reusable release-reconciliation workflow for `workflow_call` consumers. It gathers the caller repository's commit
 history through a selected commit, combines the shared release policy in this repository with optional caller policy
-overrides, asks the configured OpenAI model which existing releases should be updated and which missing release
-milestones should be created, and can apply those changes when explicitly enabled.
+overrides, asks the configured OpenAI model which existing releases need updates and which missing release milestones
+need creation, and can apply those changes when explicitly enabled.
 
 The context-gathering, planning, and apply logic live in `.github/scripts/gather-release-context.js`,
-`plan-release-reconciliation.js`, and `apply-release-reconciliation.js`, each covered by `node --test` unit tests run
-through `.github/workflows/ci-self.yml`.
+`plan-release-reconciliation.js`, and `apply-release-reconciliation.js`. The `node --test` suites run through
+`.github/workflows/ci-self.yml` and cover each script.
 
 Typical caller wrapper:
 
@@ -162,7 +171,7 @@ Important inputs:
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
 The workflow always reconciles against the caller repository's GitHub-reported default branch, with no override input;
-report-only review artifacts are retained for 30 days.
+GitHub Actions retains report-only review artifacts for 30 days.
 
 The local `.github/workflows/auto-release-self.yml` wrapper uses the reusable defaults, so manual runs in this
 repository are report-only unless `publish` is explicitly enabled.
@@ -176,30 +185,57 @@ Optional secrets:
 - `RELEASE_TOKEN` for release and tag creation
 - `CHECKOUT_TOKEN` for reading private repositories used by the workflow
 
-Every successful planning run writes a Markdown review summary to the Actions run summary and uploads a review artifact
-named `release-review-<repo>-<sha>`. The artifact includes `release-review-summary.md`, `release-plan.json`,
-`release-context.json`, `existing-releases.raw.json`, `commits.tsv`, and `files.txt`. Multi-repository historical review
-runs should keep `publish: false`, download the review artifacts from each repository run, compare the proposed
-create/update/skip actions, then respond by updating release policy or rerunning with different inputs. GitHub Actions
-does not support editing propositions inside the running planning step; publication should be a later explicit run after
-the reviewed plan is approved.
+Every successful planning run writes a Markdown summary to the Actions run summary and uploads an artifact named
+`release-review-<repo>-<sha>` containing:
+
+- `release-review-summary.md`
+- `release-plan.json`
+- `release-context.json`
+- `existing-releases.raw.json`
+- `commits.tsv`
+- `files.txt`
+
+For multi-repository historical reviews:
+
+1. keep `publish: false`
+2. download each repository's artifact
+3. compare the proposed create/update/skip actions
+4. update the release policy or rerun with different inputs
+
+GitHub Actions cannot edit propositions inside the running planning step, so publish in a later explicit run after
+approving the plan.
 
 ### `.github/workflows/ci-self.yml`
 
-Local workflow for this repository's own `.github/scripts` package. It runs on pushes to `dev` and `main` that
-touch `.github/scripts/**`, `.github/workflows/ci-self.yml`, `.github/workflows/ci.yml`, `.gitignore`, `.prettierrc.cjs`,
-`eslint.config.mjs`, `package.json`, or `package-lock.json`, plus manual dispatch, then delegates to
-`.github/workflows/ci.yml` with formatting, linting, and `npm test` enabled. `run-check` and `run-build` are disabled
-since this repository has no type check or build step. Manual dispatch from the GitHub Actions UI is accepted only for
-`allowed-dispatch-actor` (default `cyaris`); `.github/workflows/ci.yml` rejects any other dispatching actor before
-running the checks.
+Local workflow for this repository's own `.github/scripts` package. It runs through manual dispatch or on pushes to
+`dev` and `main` that touch:
+
+- `.github/scripts/**`
+- `.github/workflows/ci-self.yml`
+- `.github/workflows/ci.yml`
+- `.gitignore`
+- `.prettierrc.cjs`
+- `eslint.config.mjs`
+- `package.json`
+- `package-lock.json`
+
+The workflow delegates to `.github/workflows/ci.yml` with formatting, linting, and `npm test` enabled. It disables
+`run-check` and `run-build` because this repository has no type-check or build step. The reusable workflow accepts a UI
+dispatch only from `allowed-dispatch-actor` (default `cyaris`) and rejects any other actor before running checks.
 
 ### `.github/workflows/ci.yml`
 
-Reusable Node package validation workflow. It checks out the caller repository, optionally checks out and builds
-local `file:` dependency repositories, runs `npm ci`, then runs the fixed `npm run format:check`, `npm run lint`,
-`npm run check`, `npm test`, and `npm run build` scripts unless the matching `run-*` flag disables that step. `run-test`
-defaults to `false` since not every caller declares a `test` script.
+Reusable Node package validation workflow. It checks out the caller repository, optionally checks out and builds local
+`file:` dependency repositories, and runs `npm ci`. It then runs these fixed scripts unless the matching `run-*` flag
+disables the step:
+
+- `npm run format:check`
+- `npm run lint`
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+`run-test` defaults to `false` because not every caller declares a `test` script.
 
 Typical caller wrapper:
 
@@ -227,13 +263,17 @@ jobs:
 Important inputs:
 
 - `working-directory` and `node-version`
-- `run-format`, `run-lint`, `run-check`, and `run-build`; set a flag to `false` to skip that standard npm script
+- standard-script flags; set one to `false` to skip its npm script
+  - `run-format`
+  - `run-lint`
+  - `run-check`
+  - `run-build`
 - `run-test` to run `npm test`, defaulting to `false`
 - optional `local-dependency-repositories` entries as `owner/repo:path:ref`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
-When `local-dependency-repositories` is used, those repositories are installed and built before the caller runs `npm ci`.
-This keeps local `file:` dependencies usable even when generated `dist/` output is ignored by Git.
+When a caller supplies `local-dependency-repositories`, the workflow installs and builds those repositories before it
+runs `npm ci`. This sequence keeps local `file:` dependencies usable even when Git ignores generated `dist/` output.
 
 Optional secret:
 
@@ -244,44 +284,77 @@ Optional secret:
 Reusable Rollup workflow for Svelte apps that need both shared CI validation and embedded bundle uploads. It resolves
 standard `svelte-lib` refs and local dependency refs to exact commit SHAs at run time, runs the shared CI workflow first,
 then runs the shared rollup upload action. Caller wrappers must limit triggers to manual dispatches and pushes to `dev`,
-`main`, or `master`; they still own manual input declarations, S3 destinations, bundle lists, extra dependency refs, and
-caller repository variables.
+`main`, or `master`. Each caller still owns:
+
+- manual input declarations
+- S3 destinations
+- bundle lists
+- extra dependency refs
+- caller repository variables
+
 Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `test_bundle.*` objects.
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
-`github-actions[bot]` for repository-controlled dispatches from upstream-watch, verified by looking up `source-run-id`
-through the GitHub API rather than trusting the actor name alone.
+`github-actions[bot]` for repository-controlled dispatches from upstream-watch; Rollup verifies them by looking up
+`source-run-id` through the GitHub API rather than trusting the actor name alone.
 
 Important inputs:
 
-- CI inputs: `working-directory`, `node-version`, `run-format`, `run-lint`, `run-check`, and `run-build`
-- Upload inputs: `dist-directory`, `bundle-files`, `s3-bucket`, `s3-prefix`, `aws-region`, `aws-role-to-assume`,
-  `manual-dry-run`, `sync-dist-extras`, `cache-control`, `metadata-refresh-files`, and `svelte-lib-repository`
+- CI inputs
+  - `working-directory`
+  - `node-version`
+  - `run-format`
+  - `run-lint`
+  - `run-check`
+  - `run-build`
+- Upload inputs
+  - `dist-directory`
+  - `bundle-files`
+  - `s3-bucket`
+  - `s3-prefix`
+  - `aws-region`
+  - `aws-role-to-assume`
+  - `manual-dry-run`
+  - `sync-dist-extras`
+  - `cache-control`
+  - `metadata-refresh-files`
+  - `svelte-lib-repository`
 - Shared dependency input: `local-dependency-repositories` for dependencies used by both CI and upload
 - `allowed-dispatch-actor`, defaulting to `cyaris`
-- `source-run-id`, populated automatically by upstream-watch's dispatch call; not intended for manual use
+- `source-run-id`, which upstream-watch's dispatch call populates automatically; not intended for manual use
 
 The `github-actions[bot]` dispatch exception only applies when `source-run-id` resolves, through the GitHub API, to an
 authorized `upstream-watch.yml` run in the same repository and the Rollup run's creation time falls within the source
 run's lifetime. `source-run-id` is caller-supplied input, so this is time-bounded authorization of a legitimate run
 reference, not cryptographic proof that the referenced run issued the dispatch; checking the creation time only limits
-how long a valid run ID stays usable, even when upstream-watch finishes before Rollup gets a runner. This requires the
-caller's job to grant `actions: read` in addition to `contents: read` and `id-token: write`, and the caller's
-`workflow_dispatch` inputs to declare and forward `source-run-id`. Callers that only dispatch manually (`cyaris`) do not
-need either change.
+how long a valid run ID stays usable, even when upstream-watch finishes before Rollup gets a runner.
+
+Automated dispatch requires:
+
+- The upstream-watch caller's job permissions:
+  - `actions: write`, for the `gh workflow run` dispatch call
+  - `contents: read`
+- The Rollup caller's job permissions:
+  - `actions: read`, so `resolve-inputs` can look up and verify `source-run-id`
+  - `contents: read`
+  - `id-token: write`, only when using `aws-role-to-assume` instead of static AWS credentials
+- A caller `workflow_dispatch` input that declares and forwards `source-run-id`
+
+Callers that only dispatch manually (`cyaris`) need neither change.
 
 Rollup callers use branch refs such as `main` for first-party local dependencies by default. The workflow resolves those
 refs once to the latest commit SHA before checking out dependencies. Dependencies listed in
-`local-dependency-repositories` use `owner/repo:path:ref` entries, such as `cyaris/fireworks:fireworks:main`. Those
-dependencies are passed to both CI and upload with the same resolved SHA, so production uploads use current upstream code
-while preserving exact commit evidence in the run.
+`local-dependency-repositories` use `owner/repo:path:ref` entries, such as `cyaris/fireworks:fireworks:main`. The workflow
+passes those dependencies to both CI and upload with the same resolved SHA, so production uploads use current upstream
+code while preserving exact commit evidence in the run.
 
 The composite upload implementation lives at `.github/actions/rollup-upload/action.yml`. AWS OIDC is the preferred
 authentication path. Rollup caller repositories should store the role ARN in a repository variable such as
-`AWS_ROLLUP_UPLOAD_ROLE_ARN`, pass it to `aws-role-to-assume`, and grant only `contents: read` and `id-token: write` on
-the job that calls `.github/workflows/rollup.yml`. If `aws-role-to-assume` is blank, the action falls back to static AWS
-access-key secrets. Dry runs validate that one of those credential paths exists, because a dry run should prove the
-configured deployment credentials are available even though it does not write S3 objects.
+`AWS_ROLLUP_UPLOAD_ROLE_ARN`, pass it to `aws-role-to-assume`, and grant `actions: read` and `contents: read` on the job
+that calls `.github/workflows/rollup.yml`; grant `id-token: write` only when using `aws-role-to-assume`. If
+`aws-role-to-assume` is blank, the action falls back to static AWS access-key secrets. Dry runs validate that one of
+those credential paths exists, because a dry run should prove the configured deployment credentials are available even
+though it does not write S3 objects.
 
 Optional secrets:
 
@@ -293,15 +366,17 @@ checkout-capable token.
 
 ### `.github/workflows/upstream-watch.yml`
 
-Reusable daily-cron watcher for repositories whose local `file:` dependencies (`svelte-lib`, and optionally others
-declared via `local-dependency-repositories`) can change without the caller repository itself getting a new commit. It
-resolves the same upstream refs `rollup.yml` resolves, compares each one against a repository variable recording the
-last-seen commit SHA, and when any upstream dependency has moved, dispatches the caller's own `Rollup` workflow via
-`workflow_dispatch`, passing its own run ID as `source-run-id` so Rollup can verify the dispatch through the GitHub API,
-so the caller rebuilds and redeploys with current upstream code. The `svelte-lib` dependency is
-always compared against `main`. Each `local-dependency-repositories` entry must track `main`, `master`, or a pinned
-commit SHA unless `allow-nonproduction-refs` is enabled, since a match dispatches a live Rollup redeploy and a moving
-nonproduction branch would otherwise do that on unrelated activity; there is no per-pull-request tracking.
+Reusable daily-cron watcher for repositories whose local `file:` dependencies can change without a new caller commit.
+The workflow:
+
+- resolves the same `svelte-lib` and `local-dependency-repositories` refs as `rollup.yml`
+- compares each resolved ref with a repository variable that records the last-seen commit SHA
+- dispatches the caller's `Rollup` workflow through `workflow_dispatch` when a dependency moves
+- passes its run ID as `source-run-id` so Rollup can authorize the dispatch through the GitHub API
+
+The workflow always compares `svelte-lib` against `main`. Each additional dependency must track `main`, `master`, or a
+pinned commit SHA unless the caller enables `allow-nonproduction-refs`. A moving nonproduction branch could otherwise
+trigger a live redeploy on unrelated activity; the watcher does not track pull requests individually.
 
 Important inputs:
 
@@ -315,12 +390,14 @@ Important inputs:
 - `dispatch-ref`, required, the branch to dispatch that workflow on
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
-Each watched dependency is tracked in a repository variable named `UPSTREAM_<PATH>_SHA`, derived from its checkout path
-(for example `svelte-lib` becomes `UPSTREAM_SVELTE_LIB_SHA`, and a `fireworks` dependency becomes
-`UPSTREAM_FIREWORKS_SHA`). The first run for a given dependency seeds that variable without dispatching a rollup, since
-there is no prior value to compare against. The stored SHA updates as soon as the dispatch call succeeds, not once the
-dispatched Rollup run finishes; a subsequent Rollup failure is visible in that workflow's own run history rather than
-retried by the next scheduled check.
+The workflow derives each tracking variable from the dependency's checkout path:
+
+- `svelte-lib` becomes `UPSTREAM_SVELTE_LIB_SHA`
+- `fireworks` becomes `UPSTREAM_FIREWORKS_SHA`
+
+The first run for a dependency seeds its variable without dispatching a rollup because no prior value exists. The
+workflow updates the stored SHA as soon as the dispatch call succeeds, rather than waiting for the Rollup run to finish.
+If Rollup later fails, its own run history records the failure; the next scheduled check does not retry it.
 
 Required secret:
 
@@ -367,9 +444,8 @@ Validation includes:
 - JSON parsing for configured release and Renovate files
 - GitHub Actions security analysis with `zizmor`
 
-The shared `zizmor` run keeps hash-pinning required for third-party GitHub Actions, but allows
-`cyaris/shared-automation` reusable workflow callers to use normal branch or tag refs while the stable major-tag model is
-being prepared.
+The shared `zizmor` run requires hash pins for third-party GitHub Actions but allows `cyaris/shared-automation` reusable
+workflow callers to use normal branch or tag refs while maintainers prepare the stable major-tag model.
 
 Important inputs:
 
