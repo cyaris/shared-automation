@@ -281,6 +281,10 @@ jobs:
                 exit 1
               fi
 
+              if [[ "$GITHUB_REF_NAME" == "dev" && ( "$ref" == "main" || "$ref" == "master" ) ]]; then
+                ref="dev"
+              fi
+
               resolved_ref="$(resolve_github_ref "$repository" "$ref" "$repository")"
               printf "%s:%s:%s\n" "$repository" "$checkout_path" "$resolved_ref"
             done <<< "$specs"
@@ -293,6 +297,8 @@ jobs:
 
           if [[ "$GITHUB_REF_NAME" == "main" || "$GITHUB_REF_NAME" == "master" ]]; then
             production="true"
+          elif [[ "$GITHUB_REF_NAME" == "dev" ]]; then
+            svelte_lib_ref="dev"
           fi
 
           if [[ "$GITHUB_EVENT_NAME" == "push" && ( "$GITHUB_REF_NAME" == "dev" || "$GITHUB_REF_NAME" == "main" || "$GITHUB_REF_NAME" == "master" ) ]]; then
