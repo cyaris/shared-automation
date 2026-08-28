@@ -8,13 +8,18 @@ on:
         required: false
         type: string
         default: cyaris/svelte-lib
+      svelte-lib-ref:
+        description: Ref to watch in the svelte-lib repository.
+        required: false
+        type: string
+        default: main
       local-dependency-repositories:
         description: Optional newline-separated local dependency specs to watch, as owner/repo:path:ref.
         required: false
         type: string
         default: ""
       allow-nonproduction-refs:
-        description: Allow local-dependency-repositories entries to track a ref other than main, master, or a pinned commit SHA. Enable only for a documented, intentional nonproduction watch.
+        description: Allow svelte-lib-ref and local-dependency-repositories entries to track a ref other than main, master, or a pinned commit SHA. Enable only for a documented, intentional nonproduction watch.
         required: false
         type: boolean
         default: false
@@ -78,9 +83,16 @@ jobs:
           GH_TOKEN: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN }}
           LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.local-dependency-repositories }}
           REPOSITORY: ${{ github.repository }}
+          DISPATCH_REF: ${{ inputs.dispatch-ref }}
+          SVELTE_LIB_REF: ${{ inputs.svelte-lib-ref }}
           SVELTE_LIB_REPOSITORY: ${{ inputs.svelte-lib-repository }}
         run: |
           set -euo pipefail
+
+          if [[ ! "$DISPATCH_REF" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            printf "Invalid dispatch-ref %s: only letters, digits, hyphens, and underscores are supported.\n" "$DISPATCH_REF" >&2
+            exit 1
+          fi
 
           resolve_github_ref() {
             local repository="$1"
@@ -128,8 +140,13 @@ jobs:
 
           variable_name_for() {
             local checkout_path="$1"
+            local variable_scope=""
 
-            printf "UPSTREAM_%s_SHA\n" "$(tr '[:lower:]-' '[:upper:]_' <<< "$checkout_path")"
+            if [[ "$DISPATCH_REF" != "main" && "$DISPATCH_REF" != "master" ]]; then
+              variable_scope="$(tr '[:lower:]-' '[:upper:]_' <<< "$DISPATCH_REF")_"
+            fi
+
+            printf "UPSTREAM_%s%s_SHA\n" "$variable_scope" "$(tr '[:lower:]-' '[:upper:]_' <<< "$checkout_path")"
           }
 
           stored_value_for() {
@@ -186,7 +203,12 @@ jobs:
             fi
           }
 
-          check_dependency "svelte-lib" "$SVELTE_LIB_REPOSITORY" "main" "svelte-lib"
+          if [[ "$ALLOW_NONPRODUCTION_REFS" != "true" && "$SVELTE_LIB_REF" != "main" && "$SVELTE_LIB_REF" != "master" && ! "$SVELTE_LIB_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            printf "Invalid svelte-lib ref %s: ref must be main, master, or a full commit SHA unless allow-nonproduction-refs is enabled.\n" "$SVELTE_LIB_REF" >&2
+            exit 1
+          fi
+
+          check_dependency "svelte-lib" "$SVELTE_LIB_REPOSITORY" "$SVELTE_LIB_REF" "svelte-lib"
 
           while IFS= read -r spec; do
             if [[ -z "$spec" ]]; then

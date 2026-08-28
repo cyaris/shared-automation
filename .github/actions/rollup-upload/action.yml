@@ -220,7 +220,7 @@ runs:
         set -euo pipefail
 
         aws_args=(--region "$AWS_REGION")
-        bundle_prefix="test_"
+        bundle_prefix="dev_"
 
         if [[ "$PRODUCTION" == "true" ]]; then
           bundle_prefix=""

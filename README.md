@@ -292,7 +292,7 @@ then runs the shared rollup upload action. Caller wrappers must limit triggers t
 - extra dependency refs
 - caller repository variables
 
-Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `test_bundle.*` objects.
+Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `dev_bundle.*` objects.
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
 `github-actions[bot]` for repository-controlled dispatches from upstream-watch; Rollup verifies them by looking up
@@ -342,11 +342,11 @@ Automated dispatch requires:
 
 Callers that only dispatch manually (`cyaris`) need neither change.
 
-Rollup callers use branch refs such as `main` for first-party local dependencies by default. The workflow resolves those
-refs once to the latest commit SHA before checking out dependencies. Dependencies listed in
-`local-dependency-repositories` use `owner/repo:path:ref` entries, such as `cyaris/fireworks:fireworks:main`. The workflow
-passes those dependencies to both CI and upload with the same resolved SHA, so production uploads use current upstream
-code while preserving exact commit evidence in the run.
+Rollup callers use production branch refs such as `main` for first-party local dependency specs. On a `dev` Rollup, the
+workflow selects each dependency's `dev` branch instead; pinned commit SHAs and other explicitly configured refs remain
+unchanged. The workflow resolves the selected refs once to exact commit SHAs before checkout. Dependencies listed in
+`local-dependency-repositories` use `owner/repo:path:ref` entries, such as `cyaris/fireworks:fireworks:main`, and the
+workflow passes them to both CI and upload with the same resolved SHA.
 
 The composite upload implementation lives at `.github/actions/rollup-upload/action.yml`. AWS OIDC is the preferred
 authentication path. Rollup caller repositories should store the role ARN in a repository variable such as
@@ -374,26 +374,33 @@ The workflow:
 - dispatches the caller's `Rollup` workflow through `workflow_dispatch` when a dependency moves
 - passes its run ID as `source-run-id` so Rollup can authorize the dispatch through the GitHub API
 
-The workflow always compares `svelte-lib` against `main`. Each additional dependency must track `main`, `master`, or a
-pinned commit SHA unless the caller enables `allow-nonproduction-refs`. A moving nonproduction branch could otherwise
-trigger a live redeploy on unrelated activity; the watcher does not track pull requests individually.
+Each invocation watches one branch set and dispatches one matching Rollup branch. Caller workflows can invoke it once
+for production refs and once for `dev`; a dev invocation enables `allow-nonproduction-refs`, watches upstream `dev`
+commits, and dispatches the caller's `dev` Rollup. Each dependency must otherwise track `main`, `master`, or a pinned
+commit SHA. The watcher compares branch commits and does not track pull requests individually.
 
 Important inputs:
 
 - `svelte-lib-repository`, defaulting to `cyaris/svelte-lib`
+- `svelte-lib-ref`, defaulting to `main`
 - `local-dependency-repositories` for additional dependencies to watch, in the same `owner/repo:path:ref` format used
-  by `rollup.yml` — callers with a Rollup dependency list can pass the identical value; each checkout path is
-  restricted to letters, digits, hyphens, and underscores since it becomes part of a repository variable name
-- `allow-nonproduction-refs`, defaulting to `false` — set to `true` only for a documented, intentional need to watch a
-  `local-dependency-repositories` entry on a ref other than `main`, `master`, or a pinned commit SHA
+  by `rollup.yml`; production watches can pass the Rollup value unchanged, while dev watches select the corresponding
+  `dev` refs. Each checkout path is restricted to letters, digits, hyphens, and underscores since it becomes part of a
+  repository variable name
+- `allow-nonproduction-refs`, defaulting to `false` — set to `true` only for a documented, intentional need to watch
+  `svelte-lib-ref` or a `local-dependency-repositories` entry on a ref other than `main`, `master`, or a pinned commit
+  SHA
 - `rollup-workflow-file`, the workflow file name in the caller repository to dispatch, defaulting to `rollup.yml`
 - `dispatch-ref`, required, the branch to dispatch that workflow on
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
-The workflow derives each tracking variable from the dependency's checkout path:
+The workflow derives production tracking variables from the dependency's checkout path and scopes nonproduction
+variables by dispatch branch:
 
 - `svelte-lib` becomes `UPSTREAM_SVELTE_LIB_SHA`
 - `fireworks` becomes `UPSTREAM_FIREWORKS_SHA`
+- `svelte-lib` dispatched to `dev` becomes `UPSTREAM_DEV_SVELTE_LIB_SHA`
+- `fireworks` dispatched to `dev` becomes `UPSTREAM_DEV_FIREWORKS_SHA`
 
 The first run for a dependency seeds its variable without dispatching a rollup because no prior value exists. The
 workflow updates the stored SHA as soon as the dispatch call succeeds, rather than waiting for the Rollup run to finish.
