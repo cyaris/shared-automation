@@ -114,7 +114,7 @@
 - Treat upstream automation, shared workflow reference, dependency-pin, Renovate, and release-policy maintenance as
   non-release work unless it changes repository user behavior or a published package/runtime API.
 - For rollup upload callers, pushes or manual dispatches from `main` or `master` should run production uploads with
-  unprefixed bundle names. Pushes or manual dispatches from `dev` should run staged uploads with `test_bundle.*` names.
+  unprefixed bundle names. Pushes or manual dispatches from `dev` should run staged uploads with `dev_bundle.*` names.
 - Do not trigger GitHub Actions workflows from pull-request events. Run pre-merge CI, build, Pages, and
   workflow-validation checks from `dev` pushes, and retain production-branch push checks after merge.
 

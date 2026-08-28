@@ -292,7 +292,7 @@ then runs the shared rollup upload action. Caller wrappers must limit triggers t
 - extra dependency refs
 - caller repository variables
 
-Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `test_bundle.*` objects.
+Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `dev_bundle.*` objects.
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
 `github-actions[bot]` for repository-controlled dispatches from upstream-watch; Rollup verifies them by looking up
