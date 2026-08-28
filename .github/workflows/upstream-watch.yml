@@ -89,6 +89,11 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [[ ! "$DISPATCH_REF" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            printf "Invalid dispatch-ref %s: only letters, digits, hyphens, and underscores are supported.\n" "$DISPATCH_REF" >&2
+            exit 1
+          fi
+
           resolve_github_ref() {
             local repository="$1"
             local ref="$2"
