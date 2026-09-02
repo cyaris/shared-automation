@@ -73,9 +73,8 @@ function resolveReleaseTargetSha(release, git) {
 }
 
 function buildExistingReleases(releasePages, commitIndexBySha, git) {
-  const rawReleases = releasePages.flat()
-
-  return rawReleases
+  return releasePages
+    .flat()
     .map(release => ({
       tag: release.tag_name || "",
       title: release.name || "",

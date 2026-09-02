@@ -83,7 +83,9 @@ function main() {
   })
 
   fs.writeFileSync(path.join(artifactDir, "release-apply-results.json"), JSON.stringify({ applied, failed }, null, 2))
-  console.log(`Applied ${applied.length} release actions with ${failed.length} failures.`)
+  console.log(
+    `Applied ${applied.length.toLocaleString()} release actions with ${failed.length.toLocaleString()} failures.`
+  )
 
   if (failed.length) {
     failed.forEach(failure => console.error(`${failure.action} ${failure.tag} failed: ${failure.message}`))
