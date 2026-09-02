@@ -26,8 +26,9 @@ The root `package.json` covers the Node scripts under `.github/scripts/` that ba
 - `npm run format:check` checks Prettier formatting
 - `npm run lint` applies ESLint
 - `npm test` runs the `node --test` suites
-- `.prettierrc.cjs` and `eslint.config.mjs` define formatting and lint rules
-- `.github/workflows/ci-self.yml` runs the format check, lint, and tests when the package changes
+
+`.prettierrc.cjs` and `eslint.config.mjs` define the formatting and lint rules those scripts apply, and
+`.github/workflows/ci-self.yml` runs the format check, lint, and tests when the package changes.
 
 ## Renovate
 
@@ -340,7 +341,7 @@ Automated dispatch requires:
   - `id-token: write`, only when using `aws-role-to-assume` instead of static AWS credentials
 - A caller `workflow_dispatch` input that declares and forwards `source-run-id`
 
-Callers that only dispatch manually (`cyaris`) need neither change.
+Callers that only dispatch manually (`cyaris`) need none of those changes.
 
 Rollup callers use production branch refs such as `main` for first-party local dependency specs. On a `dev` Rollup, the
 workflow selects each dependency's `dev` branch instead; pinned commit SHAs and other explicitly configured refs remain
@@ -459,6 +460,10 @@ Important inputs:
 - `json-files`, defaulting to `renovate.json`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
-Pure thin-caller repositories do not need a local wrapper by default. Add one when a repository owns local shell logic,
-deployment permissions, Pages deployment steps, rollup resolver behavior, or other workflow behavior that should be
-validated before merge.
+Pure thin-caller repositories do not need a local wrapper by default. Add one when a repository owns workflow behavior
+that should be validated before merge:
+
+- local shell logic
+- deployment permissions
+- Pages deployment steps
+- rollup resolver behavior

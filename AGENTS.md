@@ -41,7 +41,10 @@
 - Keep README and AGENTS guidance focused on current behavior, active requirements, and durable project decisions. Remove
   migration-era notes, deprecated-option explanations, old fallback paths, and historical caveats once they no longer
   affect how someone uses, maintains, deploys, or releases the project. When a state change makes a requirement obsolete,
-  update the affected docs and configuration in that same change.
+  update the affected docs and configuration in that same change. This removes content that has stopped being true, never
+  an accurate statement of how the project works today: a fact stays documented while it holds, including when a tracked
+  issue proposes replacing the behavior, and including when the same fact is stated in another section. Consolidate a
+  genuine repetition by choosing which section owns it and keeping that one, rather than deleting both.
 - Do not add repository-owned `CHANGELOG.md` files. Keep durable current behavior in README/AGENTS documentation and
   publish milestone history through GitHub release notes.
 - Keep README link behavior intentional and consistent. Use standard Markdown links by default, and use HTML anchors
@@ -71,14 +74,24 @@
   is unknown, irrelevant, or less important than the resulting state; do not perform mechanical voice rewrites.
 - When documenting multiple README tables, files, or generated outputs, describe each item separately when a shared
   description would become vague or hide meaningful differences.
-- Use prose instead of a bullet list when a section would contain only one bullet. Prefer prose over subbullets when a
-  nested list would have only two items, unless the pair needs extra visual separation to avoid ambiguity.
+- Do not restate a section's subject in the text directly beneath its heading. A heading such as
+  `### \`.github/workflows/rollup.yml\`` or `### \`contact.html\`` already names the file, so the text below it opens with
+  the verb: `Calls the shared rollup workflow with these local details:`, not `The \`Rollup\` workflow calls the shared
+  rollup workflow with these local details:`. This applies to prose and bullets alike.
+- Use prose instead of a bullet list when a section would contain only one bullet, unless the section heading already
+  names the subject; prose would then have to restate that subject, so keep the single bullet and let it open with the
+  verb. Prefer prose over subbullets when a nested list would have only two items, unless the pair needs extra visual
+  separation to avoid ambiguity.
 - When an example supports an existing README bullet, make the example a subbullet under that point even when there is
   only one example. Use `Example:` for one example and `Examples:` for multiple examples.
 - Let table-of-contents nesting reflect the document structure even when a section has only two children.
 - Keep documentation style guidance in AGENTS.md instead of the README.
 - Keep future maintainer instructions in AGENTS.md instead of the README. The README should describe project behavior,
-  commands, outputs, and user-facing effects rather than telling future editors what they should do.
+  commands, outputs, and user-facing effects rather than telling future editors what they should do. This covers durable
+  standing conventions only, such as a step that must be repeated whenever a given file changes. Do not move an open work
+  item into AGENTS.md: a `TODO`, a known gap, a planned migration, or an undecided design choice is tracked where the
+  project already tracks work, such as a GitHub issue or the README note that already records it, because AGENTS.md
+  states how the repository is maintained rather than what is still outstanding.
 - In Markdown files, always format the literal as `null`.
 - Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
 - Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
