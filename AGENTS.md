@@ -74,10 +74,10 @@
   is unknown, irrelevant, or less important than the resulting state; do not perform mechanical voice rewrites.
 - When documenting multiple README tables, files, or generated outputs, describe each item separately when a shared
   description would become vague or hide meaningful differences.
-- Do not restate a section's subject in the text directly beneath its heading. A heading such as
-  `### \`.github/workflows/rollup.yml\`` or `### \`contact.html\`` already names the file, so the text below it opens with
-  the verb: `Calls the shared rollup workflow with these local details:`, not `The \`Rollup\` workflow calls the shared
-  rollup workflow with these local details:`. This applies to prose and bullets alike.
+- Do not restate a section's subject in the text directly beneath its heading. A heading that already names a file, such
+  as `.github/workflows/rollup.yml` or `contact.html`, makes that restatement redundant, so the text below it opens with
+  the verb: "Calls the shared rollup workflow with these local details:", not "The `Rollup` workflow calls the shared
+  rollup workflow with these local details:". This applies to prose and bullets alike.
 - Use prose instead of a bullet list when a section would contain only one bullet, unless the section heading already
   names the subject; prose would then have to restate that subject, so keep the single bullet and let it open with the
   verb. Prefer prose over subbullets when a nested list would have only two items, unless the pair needs extra visual
