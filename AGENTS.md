@@ -16,7 +16,9 @@
   `cyaris/shared-automation` refs on `main`. Rollup local dependency specs should name production refs such as `main`
   unless a repository documents an intentional override; the shared Rollup workflow substitutes `dev` for those
   production refs when the caller runs on `dev`, then resolves every selected ref to an exact commit SHA before checkout
-  and upload. Dependencies needed by both CI and upload should be listed in `local-dependency-repositories`.
+  and upload. Dependencies needed by both CI and upload should be listed in `local-dependency-repositories`. Rollup
+  checks out `svelte-lib` from the separate `svelte-lib-repository` and `svelte-lib-ref` inputs instead of that list,
+  applying the same `dev` substitution and SHA pinning.
 - Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
 - Keep release boundary decisions in the shared auto-release workflow and release-policy files. Caller repositories should
   not add separate release automation unless the user explicitly asks for a repository-specific exception.
