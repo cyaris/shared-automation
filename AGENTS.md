@@ -211,6 +211,11 @@
 
 ## Workflow Validation And Security
 
+- Never merge a pull request unless the user explicitly instructs you to merge that specific pull request or an
+  unambiguous identified set of pull requests. Requests to fix, finish, deploy, publish, investigate, make checks green,
+  or continue do not authorize a merge; neither do green checks, review completion, mergeability, or prior authorization
+  for a different pull request. When a pull request is ready without explicit merge authorization, leave it open and
+  report its readiness.
 - Keep `.github/workflows/workflow-validation.yml` aligned with workflow and composite-action changes so `actionlint` and
   `zizmor` run when automation files change.
 - Add workflow-validation callers to dependent repositories when they own meaningful local workflow logic, such as
