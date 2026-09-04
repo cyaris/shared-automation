@@ -17,6 +17,21 @@ on:
         description: Newline-separated bundle file specs as path:content-type, relative to dist-directory.
         required: true
         type: string
+      production-files:
+        description: Optional newline-separated source:key:content-type specs, relative to the caller repository root and uploaded only for production branches.
+        required: false
+        type: string
+        default: ""
+      cloudfront-distribution-id:
+        description: Optional CloudFront distribution ID to invalidate after an upload.
+        required: false
+        type: string
+        default: ""
+      cloudfront-invalidation-paths:
+        description: Newline-separated paths to invalidate when cloudfront-distribution-id is set.
+        required: false
+        type: string
+        default: ""
       s3-bucket:
         description: Destination S3 bucket.
         required: false
@@ -417,6 +432,9 @@ jobs:
           working-directory: ${{ inputs.working-directory }}
           dist-directory: ${{ inputs.dist-directory }}
           bundle-files: ${{ inputs.bundle-files }}
+          production-files: ${{ inputs.production-files }}
+          cloudfront-distribution-id: ${{ inputs.cloudfront-distribution-id }}
+          cloudfront-invalidation-paths: ${{ inputs.cloudfront-invalidation-paths }}
           s3-bucket: ${{ inputs.s3-bucket }}
           s3-prefix: ${{ inputs.s3-prefix }}
           aws-region: ${{ inputs.aws-region }}

@@ -162,6 +162,7 @@ async function main() {
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 120000)
+
   let responseText
   let response
 
