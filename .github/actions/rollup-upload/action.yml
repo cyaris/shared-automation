@@ -251,13 +251,21 @@ runs:
           exit 1
         fi
 
-        if [[ -n "$CLOUDFRONT_INVALIDATION_PATHS" && -z "$CLOUDFRONT_DISTRIBUTION_ID" ]]; then
+        invalidation_paths=()
+
+        while IFS= read -r path; do
+          if [[ -n "$path" ]]; then
+            invalidation_paths+=("$path")
+          fi
+        done <<< "$CLOUDFRONT_INVALIDATION_PATHS"
+
+        if [[ ${#invalidation_paths[@]} -gt 0 && -z "$CLOUDFRONT_DISTRIBUTION_ID" ]]; then
           printf "cloudfront-distribution-id is required when cloudfront-invalidation-paths is set.\n" >&2
           exit 1
         fi
 
-        if [[ -n "$CLOUDFRONT_DISTRIBUTION_ID" && -z "$CLOUDFRONT_INVALIDATION_PATHS" ]]; then
-          printf "cloudfront-invalidation-paths is required when cloudfront-distribution-id is set.\n" >&2
+        if [[ -n "$CLOUDFRONT_DISTRIBUTION_ID" && ${#invalidation_paths[@]} -eq 0 ]]; then
+          printf "cloudfront-invalidation-paths must list at least one non-empty path when cloudfront-distribution-id is set.\n" >&2
           exit 1
         fi
 
@@ -273,6 +281,8 @@ runs:
         done <<< "$BUNDLE_FILES"
 
         if [[ "$PRODUCTION" == "true" ]]; then
+          caller_root="$(cd "${CALLER_REPOSITORY_NAME%/}" && pwd -P)"
+
           while IFS= read -r spec; do
             if [[ -z "$spec" ]]; then
               continue
@@ -291,6 +301,13 @@ runs:
 
             if [[ ! -f "$source_file" ]]; then
               printf "Missing expected production file: %s\n" "$source_file" >&2
+              exit 1
+            fi
+
+            resolved_source="$(cd "$(dirname "$source_file")" && pwd -P)/$(basename "$source_file")"
+
+            if [[ "$resolved_source" != "$caller_root"/* ]]; then
+              printf "production-files entry resolves outside the caller repository: %s\n" "$spec" >&2
               exit 1
             fi
 
@@ -352,13 +369,6 @@ runs:
         done <<< "$METADATA_REFRESH_FILES"
 
         if [[ -n "$CLOUDFRONT_DISTRIBUTION_ID" ]]; then
-          invalidation_paths=()
-          while IFS= read -r path; do
-            if [[ -n "$path" ]]; then
-              invalidation_paths+=("$path")
-            fi
-          done <<< "$CLOUDFRONT_INVALIDATION_PATHS"
-
           if [[ "$DRY_RUN" == "true" ]]; then
             printf "Would invalidate CloudFront distribution %s paths:" "$CLOUDFRONT_DISTRIBUTION_ID"
             printf " %s" "${invalidation_paths[@]}"
