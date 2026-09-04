@@ -296,7 +296,8 @@ then runs the shared rollup upload action. Caller wrappers must limit triggers t
 Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `dev_bundle.*` objects.
 Callers can map repository-root files to explicit S3 keys through `production-files`; those files upload only from
 `main` or `master`. A caller that configures CloudFront invalidation must pass both the distribution ID and at least one
-invalidation path, and the workflow fails before upload when either half is missing.
+invalidation path, and the workflow fails before upload when either half is missing. Unlike `production-files`,
+invalidation runs on every branch, so a `dev` run also invalidates the configured paths.
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
 `github-actions[bot]` for repository-controlled dispatches from upstream-watch; Rollup verifies them by looking up
@@ -361,7 +362,9 @@ authentication path. Rollup caller repositories should store the role ARN in a r
 that calls `.github/workflows/rollup.yml`; grant `id-token: write` only when using `aws-role-to-assume`. If
 `aws-role-to-assume` is blank, the action falls back to static AWS access-key secrets. Dry runs validate that one of
 those credential paths exists, because a dry run should prove the configured deployment credentials are available even
-though it does not write S3 objects.
+though it does not write S3 objects. Callers that set `cloudfront-distribution-id` must also grant
+`cloudfront:CreateInvalidation` to that role or access key, because the invalidation runs after every S3 upload has
+already succeeded.
 
 Optional secrets:
 
