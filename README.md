@@ -294,6 +294,9 @@ then runs the shared rollup upload action. Caller wrappers must limit triggers t
 - caller repository variables
 
 Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `dev_bundle.*` objects.
+Callers can map repository-root files to explicit S3 keys through `production-files`; those files upload only from
+`main` or `master`. A caller that configures CloudFront invalidation must pass both the distribution ID and at least one
+invalidation path, and the workflow fails before upload when either half is missing.
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
 `github-actions[bot]` for repository-controlled dispatches from upstream-watch; Rollup verifies them by looking up
@@ -311,6 +314,9 @@ Important inputs:
 - Upload inputs
   - `dist-directory`
   - `bundle-files`
+  - `production-files`
+  - `cloudfront-distribution-id`
+  - `cloudfront-invalidation-paths`
   - `s3-bucket`
   - `s3-prefix`
   - `aws-region`

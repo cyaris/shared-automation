@@ -16,6 +16,18 @@ inputs:
   bundle-files:
     description: Newline-separated bundle file specs as path:content-type, relative to dist-directory.
     required: true
+  production-files:
+    description: Optional newline-separated source:key:content-type specs, relative to the caller repository root and uploaded only for production branches.
+    required: false
+    default: ""
+  cloudfront-distribution-id:
+    description: Optional CloudFront distribution ID to invalidate after an upload.
+    required: false
+    default: ""
+  cloudfront-invalidation-paths:
+    description: Newline-separated paths to invalidate when cloudfront-distribution-id is set.
+    required: false
+    default: ""
   s3-bucket:
     description: Destination S3 bucket.
     required: false
@@ -208,10 +220,14 @@ runs:
         AWS_REGION: ${{ inputs.aws-region }}
         BUNDLE_FILES: ${{ inputs.bundle-files }}
         CACHE_CONTROL: ${{ inputs.cache-control }}
+        CALLER_REPOSITORY_NAME: ${{ inputs.caller-repository-name }}
+        CLOUDFRONT_DISTRIBUTION_ID: ${{ inputs.cloudfront-distribution-id }}
+        CLOUDFRONT_INVALIDATION_PATHS: ${{ inputs.cloudfront-invalidation-paths }}
         DIST_DIRECTORY: ${{ inputs.caller-repository-name }}/${{ inputs.dist-directory }}
         DRY_RUN: ${{ inputs.dry-run }}
         METADATA_REFRESH_FILES: ${{ inputs.metadata-refresh-files }}
         PRODUCTION: ${{ inputs.production }}
+        PRODUCTION_FILES: ${{ inputs.production-files }}
         S3_BUCKET: ${{ inputs.s3-bucket }}
         S3_PREFIX: ${{ inputs.s3-prefix }}
         SYNC_DIST_EXTRAS: ${{ inputs.sync-dist-extras }}
@@ -235,6 +251,16 @@ runs:
           exit 1
         fi
 
+        if [[ -n "$CLOUDFRONT_INVALIDATION_PATHS" && -z "$CLOUDFRONT_DISTRIBUTION_ID" ]]; then
+          printf "cloudfront-distribution-id is required when cloudfront-invalidation-paths is set.\n" >&2
+          exit 1
+        fi
+
+        if [[ -n "$CLOUDFRONT_DISTRIBUTION_ID" && -z "$CLOUDFRONT_INVALIDATION_PATHS" ]]; then
+          printf "cloudfront-invalidation-paths is required when cloudfront-distribution-id is set.\n" >&2
+          exit 1
+        fi
+
         sync_exclude_args=()
 
         while IFS= read -r spec; do
@@ -245,6 +271,35 @@ runs:
           bundle_path="${spec%%:*}"
           sync_exclude_args+=(--exclude "$bundle_path")
         done <<< "$BUNDLE_FILES"
+
+        if [[ "$PRODUCTION" == "true" ]]; then
+          while IFS= read -r spec; do
+            if [[ -z "$spec" ]]; then
+              continue
+            fi
+
+            source_path="${spec%%:*}"
+            remainder="${spec#*:}"
+            s3_key="${remainder%%:*}"
+            content_type="${remainder#*:}"
+            source_file="${CALLER_REPOSITORY_NAME%/}/${source_path}"
+
+            if [[ "$source_path" == "$spec" || "$s3_key" == "$remainder" || -z "$source_path" || -z "$s3_key" || -z "$content_type" ]]; then
+              printf "Invalid production file spec: %s\n" "$spec" >&2
+              exit 1
+            fi
+
+            if [[ ! -f "$source_file" ]]; then
+              printf "Missing expected production file: %s\n" "$source_file" >&2
+              exit 1
+            fi
+
+            aws s3 cp "$source_file" "s3://${S3_BUCKET}/${s3_key}" \
+              "${aws_args[@]}" \
+              --content-type "$content_type" \
+              --cache-control "$CACHE_CONTROL"
+          done <<< "$PRODUCTION_FILES"
+        fi
 
         if [[ "$SYNC_DIST_EXTRAS" == "true" ]]; then
           aws s3 sync "$DIST_DIRECTORY/" "s3://${S3_BUCKET}/${S3_PREFIX%/}/" \
@@ -295,3 +350,20 @@ runs:
             --content-type "$content_type" \
             --cache-control "$CACHE_CONTROL"
         done <<< "$METADATA_REFRESH_FILES"
+
+        if [[ -n "$CLOUDFRONT_DISTRIBUTION_ID" ]]; then
+          invalidation_paths=()
+          while IFS= read -r path; do
+            if [[ -n "$path" ]]; then
+              invalidation_paths+=("$path")
+            fi
+          done <<< "$CLOUDFRONT_INVALIDATION_PATHS"
+
+          if [[ "$DRY_RUN" == "true" ]]; then
+            printf "Would invalidate CloudFront distribution %s paths:" "$CLOUDFRONT_DISTRIBUTION_ID"
+            printf " %s" "${invalidation_paths[@]}"
+            printf "\n"
+          else
+            aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "${invalidation_paths[@]}"
+          fi
+        fi
