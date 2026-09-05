@@ -56,6 +56,11 @@ on:
         required: false
         type: boolean
         default: false
+      deployment-enabled:
+        description: Run the upload job after CI succeeds. Disable only while a caller's deployment target is not ready.
+        required: false
+        type: boolean
+        default: true
       sync-dist-extras:
         description: Sync non-bundle files from dist-directory to the S3 prefix.
         required: false
@@ -355,6 +360,7 @@ jobs:
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
   rollup-upload:
+    if: inputs.deployment-enabled
     needs:
       - node-package-ci
       - resolve-inputs

@@ -14,7 +14,7 @@
 - Do not define a local variable if it is referenced only once unless its name materially improves clarity or the variable is needed for correctness; otherwise, inline its value. Line wrapping alone does not justify a single-use variable.
 - Group consecutive statements by purpose with one blank line between groups. Keep statements together when they are the same kind or directly sequentially related; a standalone comment counts as the separator, so do not also add a blank line immediately before it solely to create separation.
 - When order has no semantic, dependency, source-order, or configuration-defined meaning, arrange lists, dictionary keys, named definitions, and other code collections alphabetically. Compare code case-sensitively with uppercase before lowercase, and let the formatter, import sorter, linter, or another installed ordering tool take precedence.
-- Format user-facing or logged numeric quantities with thousands separators. In Python, include `,` in the format specifier, such as `f"{count:,d}"` or `f"{count:,}"`. Do not apply numeric formatting to identifiers or other values whose digits are not quantities.
+- Format user-facing or human-readable logged numeric quantities with thousands separators. In Python, include `,` in the format specifier, such as `f"{count:,d}"` or `f"{count:,}"`. Do not apply numeric formatting to identifiers, to other values whose digits are not quantities, or to structured log fields a parser or metrics pipeline consumes, because the separators make them locale-dependent strings.
 - Declare every installed dependency in the owning project's dependency file rather than relying on the local environment or a transitive dependency.
 
 ### Python
@@ -61,6 +61,15 @@
   and upload. Dependencies needed by both CI and upload should be listed in `local-dependency-repositories`. Rollup
   checks out `svelte-lib` from the separate `svelte-lib-repository` and `svelte-lib-ref` inputs instead of that list,
   applying the same `dev` substitution and SHA pinning.
+- Do not hardcode commit SHAs in first-party `cyaris/*` reusable workflow, composite-action, or source dependency
+  references to expose an upstream feature before it reaches the referenced branch. Keep caller configuration on the
+  appropriate `main`, `master`, or documented `dev` branch contract; exact SHAs resolved internally by a workflow for a
+  single reproducible run are not hardcoded caller references. Third-party GitHub Actions remain SHA-pinned under the
+  security rule below.
+- When a downstream change needs an upstream feature that is not yet available on its configured branch, tell the user
+  before publication that the downstream workflow, build, or runtime will fail until upstream lands. Publish and merge
+  the upstream change first, then publish the downstream change; do not silently pin the unpublished upstream commit or
+  knowingly publish the broken downstream caller unless the user explicitly directs that exception.
 - Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
 - Keep release boundary decisions in the shared auto-release workflow and release-policy files. Caller repositories should
   not add separate release automation unless the user explicitly asks for a repository-specific exception.
@@ -177,6 +186,8 @@
   non-release work unless it changes repository user behavior or a published package/runtime API.
 - For rollup upload callers, pushes or manual dispatches from `main` or `master` should run production uploads with
   unprefixed bundle names. Pushes or manual dispatches from `dev` should run staged uploads with `dev_bundle.*` names.
+- When a Rollup caller needs a temporary deployment-readiness gate, pass the shared `deployment-enabled` input. Keep the
+  caller job active so shared CI still runs, and apply the gate only to the shared upload job.
 - Do not trigger GitHub Actions workflows from pull-request events. Run pre-merge CI, build, Pages, and
   workflow-validation checks from `dev` pushes, and retain production-branch push checks after merge.
 
@@ -219,8 +230,10 @@
 - Keep `.github/workflows/workflow-validation.yml` aligned with workflow and composite-action changes so `actionlint` and
   `zizmor` run when automation files change.
 - Add workflow-validation callers to dependent repositories when they own meaningful local workflow logic, such as
-  deployment jobs, rollup input-resolution shell, local permissions decisions, or nontrivial Pages workflows. Avoid
-  adding validation wrappers solely for repositories that contain only thin calls to shared workflows.
+  deployment jobs, rollup input-resolution shell, local permissions decisions, secret wiring, dispatch inputs,
+  concurrency behavior, or nontrivial Pages workflows. A thin reusable-workflow caller still owns meaningful local
+  logic when it declares any of those behaviors. Avoid adding validation wrappers solely for repositories whose local
+  workflows are completely declarative calls without security-sensitive or behavioral configuration.
 - Before merging any pull request, explicitly inspect CodeRabbit comments and reviews and assess every still-applicable
   finding; do not merge solely because checks are green.
 - Treat `actionlint` failures as workflow contract or syntax issues to fix before rollout.

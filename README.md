@@ -280,6 +280,55 @@ Optional secret:
 
 - `CHECKOUT_TOKEN` for reading private dependency repositories
 
+### `.github/workflows/python-ci.yml`
+
+Reusable Python project validation workflow. It checks out the caller repository, installs the project with its `dev`
+extra, and runs these fixed checks unless the matching `run-*` input disables the step:
+
+- `python -m black --check .`
+- `python -m isort --check-only .`
+- `python -m pytest`
+
+Typical caller wrapper:
+
+```yaml
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-ci:
+    uses: cyaris/shared-automation/.github/workflows/python-ci.yml@main
+    with:
+      working-directory: backend
+```
+
+Important inputs:
+
+- `working-directory` and `python-version`
+- fixed-check flags
+  - `run-black`
+  - `run-isort`
+  - `run-pytest`
+- `pre-test-python-script` for an optional checked-in Python data-preparation entry point
+- `data-cache-path` and `data-cache-key`, which must be supplied together when prepared test data should persist across runs
+- `allowed-dispatch-actor`, defaulting to `cyaris`
+
+The optional preparation script and cache path must stay within `working-directory`. The workflow restores the data
+cache before invoking the script, so the caller's script remains responsible for downloading only missing or stale
+inputs and validating the resulting dataset.
+
 ### `.github/workflows/rollup.yml`
 
 Reusable Rollup workflow for Svelte apps that need both shared CI validation and embedded bundle uploads. It resolves
@@ -293,11 +342,19 @@ then runs the shared rollup upload action. Caller wrappers must limit triggers t
 - extra dependency refs
 - caller repository variables
 
+`deployment-enabled` defaults to `true`. A caller whose deployment target is not ready can set it to `false`; shared CI
+still runs, while only the upload job is skipped.
+
 Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `dev_bundle.*` objects.
 Callers can map repository-root files to explicit S3 keys through `production-files`; those files upload only from
 `main` or `master`. A caller that configures CloudFront invalidation must pass both the distribution ID and at least one
 invalidation path, and the workflow fails before upload when either half is missing. Unlike `production-files`,
 invalidation runs on every branch, so a `dev` run also invalidates the configured paths.
+
+After each configured bundle or production-file upload, the workflow reads the object back from S3 and verifies both
+its declared `Content-Type` and a SHA-256 digest against the local source. Dry runs print upload operations without
+performing this remote verification.
+
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
 `github-actions[bot]` for repository-controlled dispatches from upstream-watch; Rollup verifies them by looking up
@@ -312,6 +369,7 @@ Important inputs:
   - `run-lint`
   - `run-check`
   - `run-build`
+- Deployment gate: `deployment-enabled`, which skips only upload after CI
 - Upload inputs
   - `dist-directory`
   - `bundle-files`
@@ -362,9 +420,11 @@ authentication path. Rollup caller repositories should store the role ARN in a r
 that calls `.github/workflows/rollup.yml`; grant `id-token: write` only when using `aws-role-to-assume`. If
 `aws-role-to-assume` is blank, the action falls back to static AWS access-key secrets. Dry runs validate that one of
 those credential paths exists, because a dry run should prove the configured deployment credentials are available even
-though it does not write S3 objects. Callers that set `cloudfront-distribution-id` must also grant
-`cloudfront:CreateInvalidation` to that role or access key, because the invalidation runs after every S3 upload has
-already succeeded.
+though it does not write S3 objects. An upload that actually runs needs `s3:GetObject` in addition to `s3:PutObject`,
+because the action reads each uploaded bundle and production file back to verify it; a dry run performs neither write
+nor read-back, and `deployment-enabled: false` skips the upload job entirely. Callers that set
+`cloudfront-distribution-id` must also grant `cloudfront:CreateInvalidation` to that role or access key, because the
+invalidation runs after every S3 upload has already succeeded.
 
 Optional secrets:
 
@@ -401,7 +461,7 @@ Important inputs:
   `svelte-lib-ref` or a `local-dependency-repositories` entry on a ref other than `main`, `master`, or a pinned commit
   SHA
 - `rollup-workflow-file`, the workflow file name in the caller repository to dispatch, defaulting to `rollup.yml`
-- `dispatch-ref`, required, the branch to dispatch that workflow on
+- `dispatch-ref`, required, the `main`, `master`, or `dev` branch to dispatch that workflow on
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
 The workflow derives production tracking variables from the dependency's checkout path and scopes nonproduction
@@ -469,10 +529,11 @@ Important inputs:
 - `json-files`, defaulting to `renovate.json`
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
-Pure thin-caller repositories do not need a local wrapper by default. Add one when a repository owns workflow behavior
-that should be validated before merge:
+Pure declarative-caller repositories do not need a local wrapper by default. Add one when a repository owns workflow
+behavior that should be validated before merge:
 
+- concurrency behavior, dispatch inputs, or secret wiring
 - local shell logic
-- deployment permissions
+- local permissions, including deployment permissions
 - Pages deployment steps
 - rollup resolver behavior

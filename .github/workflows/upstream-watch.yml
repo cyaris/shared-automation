@@ -29,7 +29,7 @@ on:
         type: string
         default: rollup.yml
       dispatch-ref:
-        description: Branch to dispatch the rollup workflow on.
+        description: Branch to dispatch the rollup workflow on. Must be main, master, or dev.
         required: true
         type: string
       allowed-dispatch-actor:
@@ -89,8 +89,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ ! "$DISPATCH_REF" =~ ^[A-Za-z0-9_-]+$ ]]; then
-            printf "Invalid dispatch-ref %s: only letters, digits, hyphens, and underscores are supported.\n" "$DISPATCH_REF" >&2
+          if [[ "$DISPATCH_REF" != "main" && "$DISPATCH_REF" != "master" && "$DISPATCH_REF" != "dev" ]]; then
+            printf "Invalid dispatch-ref %s: expected main, master, or dev.\n" "$DISPATCH_REF" >&2
             exit 1
           fi
 
