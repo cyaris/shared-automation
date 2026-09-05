@@ -14,7 +14,7 @@
 - Do not define a local variable if it is referenced only once unless its name materially improves clarity or the variable is needed for correctness; otherwise, inline its value. Line wrapping alone does not justify a single-use variable.
 - Group consecutive statements by purpose with one blank line between groups. Keep statements together when they are the same kind or directly sequentially related; a standalone comment counts as the separator, so do not also add a blank line immediately before it solely to create separation.
 - When order has no semantic, dependency, source-order, or configuration-defined meaning, arrange lists, dictionary keys, named definitions, and other code collections alphabetically. Compare code case-sensitively with uppercase before lowercase, and let the formatter, import sorter, linter, or another installed ordering tool take precedence.
-- Format user-facing or logged numeric quantities with thousands separators. In Python, include `,` in the format specifier, such as `f"{count:,d}"` or `f"{count:,}"`. Do not apply numeric formatting to identifiers or other values whose digits are not quantities.
+- Format user-facing or human-readable logged numeric quantities with thousands separators. In Python, include `,` in the format specifier, such as `f"{count:,d}"` or `f"{count:,}"`. Do not apply numeric formatting to identifiers, to other values whose digits are not quantities, or to structured log fields a parser or metrics pipeline consumes, because the separators make them locale-dependent strings.
 - Declare every installed dependency in the owning project's dependency file rather than relying on the local environment or a transitive dependency.
 
 ### Python
