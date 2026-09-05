@@ -54,22 +54,24 @@
 - Keep composite GitHub Actions in `.github/actions`.
 - Keep shared CI, rollup, auto-create-dev-PR, and auto-release implementation changes in this repository. Caller repositories should keep thin local wrapper workflows that define triggers, permissions, inputs, secrets, and repository-specific values before calling the reusable workflow here.
 - Keep reusable workflow defaults general. Caller-specific commands, local dependency refs, bundle file lists, metadata refresh files, branch selections, S3 prefixes, and release naming or milestone overrides belong in caller workflow inputs or caller release-policy files.
-- First-party upstream refs should track the latest production branch by default. Reusable workflow callers may use
-  `cyaris/shared-automation` refs on `main`. Rollup local dependency specs should name production refs such as `main`
+- First-party upstream refs should track the latest production branch by default. Reusable workflow and composite-action
+  callers must use `cyaris/shared-automation` refs on `main`, including when a new downstream caller temporarily fails
+  because its required shared feature exists only on `dev`. Rollup local dependency specs should name production refs
+  such as `main`
   unless a repository documents an intentional override; the shared Rollup workflow substitutes `dev` for those
   production refs when the caller runs on `dev`, then resolves every selected ref to an exact commit SHA before checkout
   and upload. Dependencies needed by both CI and upload should be listed in `local-dependency-repositories`. Rollup
   checks out `svelte-lib` from the separate `svelte-lib-repository` and `svelte-lib-ref` inputs instead of that list,
   applying the same `dev` substitution and SHA pinning.
-- Do not hardcode commit SHAs in first-party `cyaris/*` reusable workflow, composite-action, or source dependency
-  references to expose an upstream feature before it reaches the referenced branch. Keep caller configuration on the
-  appropriate `main`, `master`, or documented `dev` branch contract; exact SHAs resolved internally by a workflow for a
-  single reproducible run are not hardcoded caller references. Third-party GitHub Actions remain SHA-pinned under the
-  security rule below.
-- When a downstream change needs an upstream feature that is not yet available on its configured branch, tell the user
-  before publication that the downstream workflow, build, or runtime will fail until upstream lands. Publish and merge
-  the upstream change first, then publish the downstream change; do not silently pin the unpublished upstream commit or
-  knowingly publish the broken downstream caller unless the user explicitly directs that exception.
+- Do not hardcode commit SHAs or substitute a feature branch in first-party `cyaris/*` reusable workflow,
+  composite-action, or source dependency references to expose an upstream feature before it reaches the referenced
+  production branch. Keep caller configuration on the appropriate `main` or `master` production-branch contract; exact
+  SHAs resolved internally by a workflow for a single reproducible run are not hardcoded caller references. Third-party
+  GitHub Actions remain SHA-pinned under the security rule below.
+- When a downstream change needs an upstream feature that is not yet available on its configured production branch,
+  tell the user before publication that the downstream workflow, build, or runtime will fail until upstream lands. Keep
+  the downstream reference on the production branch and publish it when requested; do not conceal the dependency by
+  pinning the unpublished commit or changing the caller to an upstream feature branch.
 - Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
 - Keep release boundary decisions in the shared auto-release workflow and release-policy files. Caller repositories should
   not add separate release automation unless the user explicitly asks for a repository-specific exception.
