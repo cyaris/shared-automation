@@ -420,9 +420,10 @@ authentication path. Rollup caller repositories should store the role ARN in a r
 that calls `.github/workflows/rollup.yml`; grant `id-token: write` only when using `aws-role-to-assume`. If
 `aws-role-to-assume` is blank, the action falls back to static AWS access-key secrets. Dry runs validate that one of
 those credential paths exists, because a dry run should prove the configured deployment credentials are available even
-though it does not write S3 objects. Callers that set `cloudfront-distribution-id` must also grant
-`cloudfront:CreateInvalidation` to that role or access key, because the invalidation runs after every S3 upload has
-already succeeded.
+though it does not write S3 objects. Every role or access key needs `s3:GetObject` in addition to `s3:PutObject`,
+because the action reads each uploaded bundle and production file back to verify it. Callers that set
+`cloudfront-distribution-id` must also grant `cloudfront:CreateInvalidation` to that role or access key, because the
+invalidation runs after every S3 upload has already succeeded.
 
 Optional secrets:
 

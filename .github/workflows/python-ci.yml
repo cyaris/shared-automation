@@ -29,7 +29,7 @@ on:
         type: boolean
         default: true
       pre-test-python-script:
-        description: Optional repository-relative Python script to run from the working directory before pytest.
+        description: Optional working-directory-relative Python script to run before pytest.
         required: false
         type: string
         default: ""
