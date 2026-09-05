@@ -177,6 +177,8 @@
   non-release work unless it changes repository user behavior or a published package/runtime API.
 - For rollup upload callers, pushes or manual dispatches from `main` or `master` should run production uploads with
   unprefixed bundle names. Pushes or manual dispatches from `dev` should run staged uploads with `dev_bundle.*` names.
+- When a Rollup caller needs a temporary deployment-readiness gate, pass the shared `deployment-enabled` input. Keep the
+  caller job active so shared CI still runs, and apply the gate only to the shared upload job.
 - Do not trigger GitHub Actions workflows from pull-request events. Run pre-merge CI, build, Pages, and
   workflow-validation checks from `dev` pushes, and retain production-branch push checks after merge.
 
@@ -219,8 +221,10 @@
 - Keep `.github/workflows/workflow-validation.yml` aligned with workflow and composite-action changes so `actionlint` and
   `zizmor` run when automation files change.
 - Add workflow-validation callers to dependent repositories when they own meaningful local workflow logic, such as
-  deployment jobs, rollup input-resolution shell, local permissions decisions, or nontrivial Pages workflows. Avoid
-  adding validation wrappers solely for repositories that contain only thin calls to shared workflows.
+  deployment jobs, rollup input-resolution shell, local permissions decisions, secret wiring, dispatch inputs,
+  concurrency behavior, or nontrivial Pages workflows. A thin reusable-workflow caller still owns meaningful local
+  logic when it declares any of those behaviors. Avoid adding validation wrappers solely for repositories whose local
+  workflows are completely declarative calls without security-sensitive or behavioral configuration.
 - Before merging any pull request, explicitly inspect CodeRabbit comments and reviews and assess every still-applicable
   finding; do not merge solely because checks are green.
 - Treat `actionlint` failures as workflow contract or syntax issues to fix before rollout.
