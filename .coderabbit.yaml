@@ -68,6 +68,10 @@ reviews:
         - Checkout token usage that could expose secrets to untrusted code
         - Missing cache or install behavior needed for clean GitHub-hosted runners
         - Deprecated compatibility aliases that are removed without a migration path
+        - Upstream-watch dispatches that trust github-actions[bot] without validating the source run, actor, workflow, repository, and active time window
+        - Dev Rollup runs that resolve production dependency refs or upload unprefixed bundles instead of branch-matched refs and dev_bundle names
+        - Production-file or CloudFront invalidation behavior that runs on nonproduction branches, accepts unsafe paths, or omits required OIDC permissions
+        - Release reconciliation that mishandles explicit SHAs or existing legacy tags without a leading v
 
     - path: "**/.github/actions/**"
       instructions: |
@@ -77,6 +81,16 @@ reviews:
         - AWS, GitHub CLI, or upload commands that can write to the wrong destination
         - Missing dry-run behavior, validation, or clear failure messages
         - Secret values or credentials that could be printed to logs
+        - Production-file sources or destinations that escape the repository or bucket root
+        - CloudFront invalidations that proceed without a configured distribution, required IAM permission, or a successful production upload
+
+    - path: "**/.github/scripts/*.js"
+      instructions: |
+        Check for:
+        - Release context, planning, summary, and apply stages that disagree on their JSON contracts or commit ordering
+        - Explicit release SHAs, existing releases, legacy tag formats, or update-existing behavior that select or mutate the wrong release
+        - GitHub API pagination, nullable fields, subprocess failures, or malformed tool output that is silently treated as success
+        - Behavior changes without matching focused tests for the affected release-reconciliation stage
 
     - path: "**/*.{md,markdown}"
       instructions: |
