@@ -67,13 +67,14 @@ grant the app read access to both the target repository and this preset reposito
 ## Branch Model
 
 Use `main` for stable reusable workflow definitions and `dev` for proposed changes. Dependent repositories should call
-`@main` so they use the latest stable shared workflow commit at run time.
+`@main` so they use the latest stable shared workflow commit at run time. If a downstream caller is published before a
+required workflow reaches `main`, leave that caller on `@main`, disclose that it will fail temporarily, and promote the
+upstream implementation normally; do not hide the dependency with an `@dev` or commit-SHA reference.
 
 Future stable references should use this model:
 
 - `@v1` for backward-compatible workflow-contract changes after the major tag is approved
 - immutable release tags such as `@v1.2.0` when a caller needs a fixed release point
-- exact commit SHAs for especially sensitive deployment paths or temporary staged rollouts
 - `@v2` only for breaking workflow-contract changes
 
 The auto-release workflow manages release reconciliation for this repository and callers that inherit the shared release
