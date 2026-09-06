@@ -246,6 +246,37 @@ runs:
           aws_args+=(--dryrun)
         fi
 
+        verify_uploaded_file() {
+          local expected_content_type="$1"
+          local local_hash
+          local remote_content_type
+          local remote_hash
+          local s3_key="$2"
+          local source_file="$3"
+
+          if [[ "$DRY_RUN" == "true" ]]; then
+            return
+          fi
+
+          remote_content_type="$(aws s3api head-object --bucket "$S3_BUCKET" --key "$s3_key" --query ContentType --output text --region "$AWS_REGION")"
+          if [[ "$remote_content_type" != "$expected_content_type" ]]; then
+            printf "Uploaded object s3://%s/%s has Content-Type %s; expected %s.\n" \
+              "$S3_BUCKET" "$s3_key" "$remote_content_type" "$expected_content_type" >&2
+            exit 1
+          fi
+
+          local_hash="$(sha256sum "$source_file" | awk '{ print $1 }')"
+          remote_hash="$(aws s3 cp "s3://${S3_BUCKET}/${s3_key}" - --region "$AWS_REGION" | sha256sum | awk '{ print $1 }')"
+          if [[ "$remote_hash" != "$local_hash" ]]; then
+            printf "Uploaded object s3://%s/%s does not match %s (SHA-256 %s != %s).\n" \
+              "$S3_BUCKET" "$s3_key" "$source_file" "$remote_hash" "$local_hash" >&2
+            exit 1
+          fi
+
+          printf "Verified s3://%s/%s (%s, SHA-256 %s).\n" \
+            "$S3_BUCKET" "$s3_key" "$expected_content_type" "$local_hash"
+        }
+
         if [[ ! -d "$DIST_DIRECTORY" ]]; then
           printf "Missing dist directory: %s\n" "$DIST_DIRECTORY" >&2
           exit 1
@@ -315,6 +346,7 @@ runs:
               "${aws_args[@]}" \
               --content-type "$content_type" \
               --cache-control "$CACHE_CONTROL"
+            verify_uploaded_file "$content_type" "$s3_key" "$source_file"
           done <<< "$PRODUCTION_FILES"
         fi
 
@@ -351,6 +383,7 @@ runs:
             "${aws_args[@]}" \
             --content-type "$content_type" \
             --cache-control "$CACHE_CONTROL"
+          verify_uploaded_file "$content_type" "$s3_key" "$source_file"
         done <<< "$BUNDLE_FILES"
 
         while IFS= read -r spec; do
