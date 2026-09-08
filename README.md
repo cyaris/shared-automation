@@ -346,15 +346,32 @@ then runs the shared rollup upload action. Caller wrappers must limit triggers t
 `deployment-enabled` defaults to `true`. A caller whose deployment target is not ready can set it to `false`; shared CI
 still runs, while only the upload job is skipped.
 
-Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `dev_bundle.*` objects.
-Callers can map repository-root files to explicit S3 keys through `production-files`; those files upload only from
-`main` or `master`. A caller that configures CloudFront invalidation must pass both the distribution ID and at least one
-invalidation path, and the workflow fails before upload when either half is missing. Unlike `production-files`,
-invalidation runs on every branch, so a `dev` run also invalidates the configured paths.
+The run's branch determines what each run uploads and invalidates:
+
+- Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `dev_bundle.*` objects.
+- `production-files` maps repository-root files to explicit S3 keys, and those files upload only from `main` or
+  `master`.
+- CloudFront invalidation runs on every branch, so a `dev` run also invalidates the configured paths.
+
+A caller that configures CloudFront invalidation must pass both the distribution ID and at least one invalidation path;
+the workflow fails before upload when either half is missing.
 
 After each configured bundle or production-file upload, the workflow reads the object back from S3 and verifies both
 its declared `Content-Type` and a SHA-256 digest against the local source. Dry runs print upload operations without
 performing this remote verification.
+
+Callers can pass public browser configuration to the Rollup build through `vite-public-environment`, using one
+`VITE_NAME=value` entry per line. Only Vite's intentionally public `VITE_*` values belong in this input; callers must
+never pass secrets. The upload job validates every entry before building and fails on an entry that:
+
+- omits `=`
+- names a key outside `VITE_[A-Z0-9_]+`
+- carries an empty value
+- repeats a key an earlier entry already set
+
+Only the first `=` separates the key from the value, so a value may itself contain `=` and spaces. Blank lines are
+skipped, so an unset input builds normally. These values reach the Rollup build alone; shared CI runs `npm run build`
+without them.
 
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
@@ -386,6 +403,7 @@ Important inputs:
   - `cache-control`
   - `metadata-refresh-files`
   - `svelte-lib-repository`
+  - `vite-public-environment`
 - Shared dependency input: `local-dependency-repositories` for dependencies used by both CI and upload
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 - `source-run-id`, which upstream-watch's dispatch call populates automatically; not intended for manual use
