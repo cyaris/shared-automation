@@ -75,6 +75,10 @@ inputs:
     description: Optional newline-separated S3 object specs as key:content-type to refresh metadata in place.
     required: false
     default: ""
+  vite-public-environment:
+    description: Optional newline-separated VITE_NAME=value entries exposed to the caller's Rollup build. Values must be public browser configuration.
+    required: false
+    default: ""
   node-version:
     description: Node.js version used for npm installs and builds.
     required: false
@@ -181,9 +185,48 @@ runs:
       run: npm ci
 
     - name: Build rollup bundle
+      env:
+        VITE_PUBLIC_ENVIRONMENT: ${{ inputs.vite-public-environment }}
       working-directory: ${{ inputs.caller-repository-name }}/${{ inputs.working-directory }}
       shell: bash
-      run: npm run rollup
+      run: |
+        set -euo pipefail
+
+        declare -A seen_keys=()
+
+        while IFS= read -r spec; do
+          if [[ -z "$spec" ]]; then
+            continue
+          fi
+
+          if [[ "$spec" != *=* ]]; then
+            printf "Invalid Vite public environment entry; expected VITE_NAME=value.\n" >&2
+            exit 1
+          fi
+
+          key="${spec%%=*}"
+          value="${spec#*=}"
+
+          if [[ ! "$key" =~ ^VITE_[A-Z0-9_]+$ ]]; then
+            printf "Invalid Vite public environment key: %s\n" "$key" >&2
+            exit 1
+          fi
+
+          if [[ -z "$value" ]]; then
+            printf "Vite public environment value is empty for %s.\n" "$key" >&2
+            exit 1
+          fi
+
+          if [[ -n "${seen_keys[$key]+x}" ]]; then
+            printf "Duplicate Vite public environment key: %s\n" "$key" >&2
+            exit 1
+          fi
+
+          seen_keys["$key"]=1
+          export "$key=$value"
+        done <<< "$VITE_PUBLIC_ENVIRONMENT"
+
+        npm run rollup
 
     - name: Validate AWS credential inputs
       env:

@@ -76,6 +76,11 @@ on:
         required: false
         type: string
         default: ""
+      vite-public-environment:
+        description: Optional newline-separated VITE_NAME=value entries exposed to the caller's Rollup build. Values must be public browser configuration.
+        required: false
+        type: string
+        default: ""
       node-version:
         description: Node.js version used for npm installs and builds.
         required: false
@@ -453,6 +458,7 @@ jobs:
           sync-dist-extras: ${{ inputs.sync-dist-extras }}
           cache-control: ${{ inputs.cache-control }}
           metadata-refresh-files: ${{ inputs.metadata-refresh-files }}
+          vite-public-environment: ${{ inputs.vite-public-environment }}
           node-version: ${{ inputs.node-version }}
           svelte-lib-directory: svelte-lib
           checkout-token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}

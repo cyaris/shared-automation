@@ -356,6 +356,10 @@ After each configured bundle or production-file upload, the workflow reads the o
 its declared `Content-Type` and a SHA-256 digest against the local source. Dry runs print upload operations without
 performing this remote verification.
 
+Callers can pass public browser configuration to the Rollup build through `vite-public-environment`, using one
+`VITE_NAME=value` entry per line. The workflow rejects malformed keys, duplicate keys, and empty values before building.
+Only Vite's intentionally public `VITE_*` values belong in this input; callers must never pass secrets.
+
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
 `github-actions[bot]` for repository-controlled dispatches from upstream-watch; Rollup verifies them by looking up
@@ -386,6 +390,7 @@ Important inputs:
   - `cache-control`
   - `metadata-refresh-files`
   - `svelte-lib-repository`
+  - `vite-public-environment`
 - Shared dependency input: `local-dependency-repositories` for dependencies used by both CI and upload
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 - `source-run-id`, which upstream-watch's dispatch call populates automatically; not intended for manual use
