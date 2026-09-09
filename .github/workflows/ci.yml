@@ -101,7 +101,7 @@ jobs:
         with:
           repository: ${{ inputs.shared-automation-repository }}
           ref: ${{ inputs.shared-automation-ref }}
-          path: shared-automation
+          path: .shared-automation-parser
           sparse-checkout: .github/scripts
           token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
           persist-credentials: false
@@ -131,6 +131,12 @@ jobs:
 
             if [[ -z "${repository:-}" || -z "${path:-}" || -z "${ref:-}" ]]; then
               printf "Invalid local dependency spec: %s\n" "$spec" >&2
+              exit 1
+            fi
+
+            # The Vite public environment parser owns this directory, so a dependency clone must not target it.
+            if [[ "$path" == ".shared-automation-parser" || "$path" == ".shared-automation-parser/"* ]]; then
+              printf "Invalid local dependency path: %s is reserved.\n" "$path" >&2
               exit 1
             fi
 
@@ -218,7 +224,7 @@ jobs:
       - name: Build
         if: inputs.run-build
         env:
-          VITE_ENVIRONMENT_PARSER: ${{ github.workspace }}/shared-automation/.github/scripts/parse-vite-environment.js
+          VITE_ENVIRONMENT_PARSER: ${{ github.workspace }}/.shared-automation-parser/.github/scripts/parse-vite-environment.js
           VITE_PUBLIC_ENVIRONMENT: ${{ inputs.vite-public-environment }}
         working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
         run: |

@@ -377,7 +377,8 @@ entry that:
 Only the first `=` separates the key from the value, so a value may itself contain `=` and spaces. Blank lines are
 skipped, so an unset input builds normally. These values reach both shared CI's `npm run build` step and the Rollup
 build; other shared CI steps do not receive them. Shared CI sparse-checks out `shared-automation-repository` at
-`shared-automation-ref` to reach the parser, and only when a caller supplies this input alongside `run-build`.
+`shared-automation-ref` into the reserved `.shared-automation-parser` directory to reach the parser, and only when a
+caller supplies this input alongside `run-build`. A `local-dependency-repositories` entry may not claim that directory.
 
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
@@ -410,6 +411,8 @@ Important inputs:
   - `metadata-refresh-files`
   - `svelte-lib-repository`
   - `vite-public-environment`
+- `shared-automation-repository` and `shared-automation-ref`, defaulting to `cyaris/shared-automation` on `main`, which
+  Rollup forwards to shared CI as the source of the Vite public environment parser
 - Shared dependency input: `local-dependency-repositories` for dependencies used by both CI and upload
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 - `source-run-id`, which upstream-watch's dispatch call populates automatically; not intended for manual use
