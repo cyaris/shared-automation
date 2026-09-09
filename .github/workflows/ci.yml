@@ -135,7 +135,11 @@ jobs:
             fi
 
             # The Vite public environment parser owns this directory, so a dependency clone must not target it.
-            if [[ "$path" == ".shared-automation-parser" || "$path" == ".shared-automation-parser/"* ]]; then
+            # Resolve first, because "./.shared-automation-parser" and "a/../.shared-automation-parser" reach it too.
+            reserved_directory="$(realpath -m .shared-automation-parser)"
+            resolved_path="$(realpath -m "$path")"
+
+            if [[ "$resolved_path" == "$reserved_directory" || "$resolved_path" == "$reserved_directory/"* ]]; then
               printf "Invalid local dependency path: %s is reserved.\n" "$path" >&2
               exit 1
             fi

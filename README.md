@@ -283,7 +283,11 @@ runs `npm ci`. This sequence keeps local `file:` dependencies usable even when G
 
 Optional secret:
 
-- `CHECKOUT_TOKEN` for reading private dependency repositories
+- `CHECKOUT_TOKEN` for reading private dependency repositories, and for reading a private
+  `shared-automation-repository` when the caller also sets `vite-public-environment`
+
+`RELEASE_TOKEN` is the fallback for both. A private parser repository that neither token can read fails the shared
+automation checkout before the build step runs.
 
 ### `.github/workflows/python-ci.yml`
 
