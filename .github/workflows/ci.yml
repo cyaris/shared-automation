@@ -18,6 +18,21 @@ on:
         required: false
         type: string
         default: ""
+      vite-public-environment:
+        description: Optional newline-separated VITE_NAME=value entries exposed to npm run build. Values must be public browser configuration.
+        required: false
+        type: string
+        default: ""
+      shared-automation-repository:
+        description: Repository supplying the Vite public environment parser.
+        required: false
+        type: string
+        default: cyaris/shared-automation
+      shared-automation-ref:
+        description: Ref of the repository supplying the Vite public environment parser.
+        required: false
+        type: string
+        default: main
       run-format:
         description: Run npm run format:check.
         required: false
@@ -80,6 +95,17 @@ jobs:
           path: ${{ github.event.repository.name }}
           persist-credentials: false
 
+      - name: Checkout shared automation
+        if: inputs.run-build && inputs.vite-public-environment != ''
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: ${{ inputs.shared-automation-repository }}
+          ref: ${{ inputs.shared-automation-ref }}
+          path: .shared-automation-parser
+          sparse-checkout: .github/scripts
+          token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
+          persist-credentials: false
+
       - name: Checkout local dependencies
         if: inputs.local-dependency-repositories != ''
         env:
@@ -105,6 +131,16 @@ jobs:
 
             if [[ -z "${repository:-}" || -z "${path:-}" || -z "${ref:-}" ]]; then
               printf "Invalid local dependency spec: %s\n" "$spec" >&2
+              exit 1
+            fi
+
+            # The Vite public environment parser owns this directory, so a dependency clone must not target it.
+            # Resolve first, because "./.shared-automation-parser" and "a/../.shared-automation-parser" reach it too.
+            reserved_directory="$(realpath -m .shared-automation-parser)"
+            resolved_path="$(realpath -m "$path")"
+
+            if [[ "$resolved_path" == "$reserved_directory" || "$resolved_path" == "$reserved_directory/"* ]]; then
+              printf "Invalid local dependency path: %s is reserved.\n" "$path" >&2
               exit 1
             fi
 
@@ -191,5 +227,22 @@ jobs:
 
       - name: Build
         if: inputs.run-build
+        env:
+          VITE_ENVIRONMENT_PARSER: ${{ github.workspace }}/.shared-automation-parser/.github/scripts/parse-vite-environment.js
+          VITE_PUBLIC_ENVIRONMENT: ${{ inputs.vite-public-environment }}
         working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
-        run: npm run build
+        run: |
+          set -euo pipefail
+
+          if [[ -n "$VITE_PUBLIC_ENVIRONMENT" ]]; then
+            environment_file="$(mktemp)"
+            trap 'rm -f "$environment_file"' EXIT
+
+            node "$VITE_ENVIRONMENT_PARSER" "$environment_file"
+
+            while IFS= read -r -d '' entry; do
+              export "${entry%%=*}=${entry#*=}"
+            done < "$environment_file"
+          fi
+
+          npm run build

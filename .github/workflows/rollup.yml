@@ -359,6 +359,9 @@ jobs:
       run-lint: ${{ inputs.run-lint }}
       run-check: ${{ inputs.run-check }}
       run-build: ${{ inputs.run-build }}
+      vite-public-environment: ${{ inputs.vite-public-environment }}
+      shared-automation-repository: ${{ inputs.shared-automation-repository }}
+      shared-automation-ref: ${{ inputs.shared-automation-ref }}
       allowed-dispatch-actor: ${{ needs.resolve-inputs.outputs.automated_dispatch_verified == 'true' && 'github-actions[bot]' || inputs.allowed-dispatch-actor }}
     secrets:
       CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN }}

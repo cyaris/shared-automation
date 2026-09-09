@@ -20,7 +20,8 @@ expressed through fixed package scripts or structured configuration.
 
 ## Node Tooling
 
-The root `package.json` covers the Node scripts under `.github/scripts/` that back `.github/workflows/auto-release.yml`.
+The root `package.json` covers the Node scripts under `.github/scripts/` that back `.github/workflows/auto-release.yml`
+and the Vite public environment parsing shared by `.github/workflows/ci.yml` and `.github/actions/rollup-upload`.
 
 - `npm run format` applies Prettier
 - `npm run format:check` checks Prettier formatting
@@ -272,6 +273,9 @@ Important inputs:
   - `run-build`
 - `run-test` to run `npm test`, defaulting to `false`
 - optional `local-dependency-repositories` entries as `owner/repo:path:ref`
+- optional `vite-public-environment` entries as `VITE_NAME=value`; values reach only `npm run build` and must be public
+- `shared-automation-repository` and `shared-automation-ref`, defaulting to `cyaris/shared-automation` on `main`, naming
+  the source of the Vite public environment parser
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
 When a caller supplies `local-dependency-repositories`, the workflow installs and builds those repositories before it
@@ -279,7 +283,11 @@ runs `npm ci`. This sequence keeps local `file:` dependencies usable even when G
 
 Optional secret:
 
-- `CHECKOUT_TOKEN` for reading private dependency repositories
+- `CHECKOUT_TOKEN` for reading private dependency repositories, and for reading a private
+  `shared-automation-repository` when the caller also sets `vite-public-environment`
+
+`RELEASE_TOKEN` is the fallback for both. A private parser repository that neither token can read fails the shared
+automation checkout before the build step runs.
 
 ### `.github/workflows/python-ci.yml`
 
@@ -362,7 +370,8 @@ performing this remote verification.
 
 Callers can pass public browser configuration to the Rollup build through `vite-public-environment`, using one
 `VITE_NAME=value` entry per line. Only Vite's intentionally public `VITE_*` values belong in this input; callers must
-never pass secrets. The upload job validates every entry before building and fails on an entry that:
+never pass secrets. `.github/scripts/parse-vite-environment.js` validates every entry before building and fails on an
+entry that:
 
 - omits `=`
 - names a key outside `VITE_[A-Z0-9_]+`
@@ -370,8 +379,10 @@ never pass secrets. The upload job validates every entry before building and fai
 - repeats a key an earlier entry already set
 
 Only the first `=` separates the key from the value, so a value may itself contain `=` and spaces. Blank lines are
-skipped, so an unset input builds normally. These values reach the Rollup build alone; shared CI runs `npm run build`
-without them.
+skipped, so an unset input builds normally. These values reach both shared CI's `npm run build` step and the Rollup
+build; other shared CI steps do not receive them. Shared CI sparse-checks out `shared-automation-repository` at
+`shared-automation-ref` into the reserved `.shared-automation-parser` directory to reach the parser, and only when a
+caller supplies this input alongside `run-build`. A `local-dependency-repositories` entry may not claim that directory.
 
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts
@@ -404,6 +415,8 @@ Important inputs:
   - `metadata-refresh-files`
   - `svelte-lib-repository`
   - `vite-public-environment`
+- `shared-automation-repository` and `shared-automation-ref`, defaulting to `cyaris/shared-automation` on `main`, which
+  Rollup forwards to shared CI as the source of the Vite public environment parser
 - Shared dependency input: `local-dependency-repositories` for dependencies used by both CI and upload
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 - `source-run-id`, which upstream-watch's dispatch call populates automatically; not intended for manual use
