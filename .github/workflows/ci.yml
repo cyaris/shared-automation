@@ -18,6 +18,11 @@ on:
         required: false
         type: string
         default: ""
+      vite-public-environment:
+        description: Optional newline-separated VITE_NAME=value entries exposed to npm run build. Values must be public browser configuration.
+        required: false
+        type: string
+        default: ""
       run-format:
         description: Run npm run format:check.
         required: false
@@ -191,5 +196,44 @@ jobs:
 
       - name: Build
         if: inputs.run-build
+        env:
+          VITE_PUBLIC_ENVIRONMENT: ${{ inputs.vite-public-environment }}
         working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
-        run: npm run build
+        run: |
+          set -euo pipefail
+
+          declare -A seen_keys=()
+
+          while IFS= read -r spec; do
+            if [[ -z "$spec" ]]; then
+              continue
+            fi
+
+            if [[ "$spec" != *=* ]]; then
+              printf "Invalid Vite public environment entry; expected VITE_NAME=value.\n" >&2
+              exit 1
+            fi
+
+            key="${spec%%=*}"
+            value="${spec#*=}"
+
+            if [[ ! "$key" =~ ^VITE_[A-Z0-9_]+$ ]]; then
+              printf "Invalid Vite public environment key: %s\n" "$key" >&2
+              exit 1
+            fi
+
+            if [[ -z "$value" ]]; then
+              printf "Vite public environment value is empty for %s.\n" "$key" >&2
+              exit 1
+            fi
+
+            if [[ -n "${seen_keys[$key]+x}" ]]; then
+              printf "Duplicate Vite public environment key: %s\n" "$key" >&2
+              exit 1
+            fi
+
+            seen_keys["$key"]=1
+            export "$key=$value"
+          done <<< "$VITE_PUBLIC_ENVIRONMENT"
+
+          npm run build

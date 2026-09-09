@@ -272,6 +272,7 @@ Important inputs:
   - `run-build`
 - `run-test` to run `npm test`, defaulting to `false`
 - optional `local-dependency-repositories` entries as `owner/repo:path:ref`
+- optional `vite-public-environment` entries as `VITE_NAME=value`; values reach only `npm run build` and must be public
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
 When a caller supplies `local-dependency-repositories`, the workflow installs and builds those repositories before it
@@ -370,8 +371,8 @@ never pass secrets. The upload job validates every entry before building and fai
 - repeats a key an earlier entry already set
 
 Only the first `=` separates the key from the value, so a value may itself contain `=` and spaces. Blank lines are
-skipped, so an unset input builds normally. These values reach the Rollup build alone; shared CI runs `npm run build`
-without them.
+skipped, so an unset input builds normally. These values reach both shared CI's `npm run build` step and the Rollup
+build; other shared CI steps do not receive them.
 
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts

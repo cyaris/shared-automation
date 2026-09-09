@@ -359,6 +359,7 @@ jobs:
       run-lint: ${{ inputs.run-lint }}
       run-check: ${{ inputs.run-check }}
       run-build: ${{ inputs.run-build }}
+      vite-public-environment: ${{ inputs.vite-public-environment }}
       allowed-dispatch-actor: ${{ needs.resolve-inputs.outputs.automated_dispatch_verified == 'true' && 'github-actions[bot]' || inputs.allowed-dispatch-actor }}
     secrets:
       CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN }}
