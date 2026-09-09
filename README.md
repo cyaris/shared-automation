@@ -20,7 +20,8 @@ expressed through fixed package scripts or structured configuration.
 
 ## Node Tooling
 
-The root `package.json` covers the Node scripts under `.github/scripts/` that back `.github/workflows/auto-release.yml`.
+The root `package.json` covers the Node scripts under `.github/scripts/` that back `.github/workflows/auto-release.yml`
+and the Vite public environment parsing shared by `.github/workflows/ci.yml` and `.github/actions/rollup-upload`.
 
 - `npm run format` applies Prettier
 - `npm run format:check` checks Prettier formatting
@@ -273,6 +274,8 @@ Important inputs:
 - `run-test` to run `npm test`, defaulting to `false`
 - optional `local-dependency-repositories` entries as `owner/repo:path:ref`
 - optional `vite-public-environment` entries as `VITE_NAME=value`; values reach only `npm run build` and must be public
+- `shared-automation-repository` and `shared-automation-ref`, defaulting to `cyaris/shared-automation` on `main`, naming
+  the source of the Vite public environment parser
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
 When a caller supplies `local-dependency-repositories`, the workflow installs and builds those repositories before it
@@ -363,7 +366,8 @@ performing this remote verification.
 
 Callers can pass public browser configuration to the Rollup build through `vite-public-environment`, using one
 `VITE_NAME=value` entry per line. Only Vite's intentionally public `VITE_*` values belong in this input; callers must
-never pass secrets. The upload job validates every entry before building and fails on an entry that:
+never pass secrets. `.github/scripts/parse-vite-environment.js` validates every entry before building and fails on an
+entry that:
 
 - omits `=`
 - names a key outside `VITE_[A-Z0-9_]+`
@@ -372,7 +376,8 @@ never pass secrets. The upload job validates every entry before building and fai
 
 Only the first `=` separates the key from the value, so a value may itself contain `=` and spaces. Blank lines are
 skipped, so an unset input builds normally. These values reach both shared CI's `npm run build` step and the Rollup
-build; other shared CI steps do not receive them.
+build; other shared CI steps do not receive them. Shared CI sparse-checks out `shared-automation-repository` at
+`shared-automation-ref` to reach the parser, and only when a caller supplies this input alongside `run-build`.
 
 This reusable workflow is not directly dispatchable from the GitHub Actions UI; manually run the caller repository's
 local wrapper workflow instead. Human dispatches remain restricted to `allowed-dispatch-actor`; Rollup also accepts

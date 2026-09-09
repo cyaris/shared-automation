@@ -23,6 +23,16 @@ on:
         required: false
         type: string
         default: ""
+      shared-automation-repository:
+        description: Repository supplying the Vite public environment parser.
+        required: false
+        type: string
+        default: cyaris/shared-automation
+      shared-automation-ref:
+        description: Ref of the repository supplying the Vite public environment parser.
+        required: false
+        type: string
+        default: main
       run-format:
         description: Run npm run format:check.
         required: false
@@ -83,6 +93,17 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           path: ${{ github.event.repository.name }}
+          persist-credentials: false
+
+      - name: Checkout shared automation
+        if: inputs.run-build && inputs.vite-public-environment != ''
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: ${{ inputs.shared-automation-repository }}
+          ref: ${{ inputs.shared-automation-ref }}
+          path: shared-automation
+          sparse-checkout: .github/scripts
+          token: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN || github.token }}
           persist-credentials: false
 
       - name: Checkout local dependencies
@@ -197,43 +218,21 @@ jobs:
       - name: Build
         if: inputs.run-build
         env:
+          VITE_ENVIRONMENT_PARSER: ${{ github.workspace }}/shared-automation/.github/scripts/parse-vite-environment.js
           VITE_PUBLIC_ENVIRONMENT: ${{ inputs.vite-public-environment }}
         working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
         run: |
           set -euo pipefail
 
-          declare -A seen_keys=()
+          if [[ -n "$VITE_PUBLIC_ENVIRONMENT" ]]; then
+            environment_file="$(mktemp)"
+            trap 'rm -f "$environment_file"' EXIT
 
-          while IFS= read -r spec; do
-            if [[ -z "$spec" ]]; then
-              continue
-            fi
+            node "$VITE_ENVIRONMENT_PARSER" "$environment_file"
 
-            if [[ "$spec" != *=* ]]; then
-              printf "Invalid Vite public environment entry; expected VITE_NAME=value.\n" >&2
-              exit 1
-            fi
-
-            key="${spec%%=*}"
-            value="${spec#*=}"
-
-            if [[ ! "$key" =~ ^VITE_[A-Z0-9_]+$ ]]; then
-              printf "Invalid Vite public environment key: %s\n" "$key" >&2
-              exit 1
-            fi
-
-            if [[ -z "$value" ]]; then
-              printf "Vite public environment value is empty for %s.\n" "$key" >&2
-              exit 1
-            fi
-
-            if [[ -n "${seen_keys[$key]+x}" ]]; then
-              printf "Duplicate Vite public environment key: %s\n" "$key" >&2
-              exit 1
-            fi
-
-            seen_keys["$key"]=1
-            export "$key=$value"
-          done <<< "$VITE_PUBLIC_ENVIRONMENT"
+            while IFS= read -r -d '' entry; do
+              export "${entry%%=*}=${entry#*=}"
+            done < "$environment_file"
+          fi
 
           npm run build
