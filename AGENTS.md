@@ -151,10 +151,11 @@
 - Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
 - Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
 - Keep private action and dependency access requirements documented in `README.md`.
-- Format Markdown pipe tables with exactly one space inside each cell boundary, such as `| Prop | Behavior |` and
-  `| --- | ---: |`. Start and end each row with `|`, without leading or trailing whitespace outside those pipes, and do
-  not add extra padding solely to align columns. Preserve required alignment markers such as `---:`, `:---`, and
-  `:---:`.
+- Keep every Markdown pipe table compact in source. This is required formatting, not a preference: use exactly one
+  space inside each cell boundary, as in `| Prop | Behavior |` and `| --- | ---: |`, and start and end each row with
+  `|` without whitespace outside those pipes. Never pad cells or lengthen separator dashes to align columns. Preserve
+  only required alignment markers such as `---:`, `:---`, and `:---:`. When editing a document for any reason,
+  preserve compact tables and restore compact formatting in every table touched by the change.
 - Downstream README files should link to this repository's workflow descriptions instead of repeating shared behavior.
   For each local wrapper, document only the applicable local trigger and branch behavior, working directory, skipped
   commands, destination or S3 prefix, bundle files and naming, dependency refs, policy overrides, and required local
