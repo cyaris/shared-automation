@@ -102,10 +102,11 @@ The workflow accepts these inputs:
 - required `stack-name`
 - `working-directory`, defaulting to `infra`
 
-AWS OIDC is preferred. A caller that passes `aws-role-to-assume` grants its reusable-workflow job `id-token: write` and
-stores the deployment role ARN in a repository variable. When the role input is empty, callers must forward
-`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. Missing credentials fail before
-checkout or deployment.
+AWS OIDC is preferred. Every caller grants its reusable-workflow job `contents: read` and `id-token: write`, because
+the shared deploy job requests the ID token and a called workflow cannot request a permission its caller withholds. A
+caller that passes `aws-role-to-assume` stores the deployment role ARN in a repository variable. When the role input is
+empty, callers must forward `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. Missing
+credentials fail before checkout or deployment.
 
 This reusable workflow is not directly dispatchable from the GitHub Actions UI. A local caller may expose
 `workflow_dispatch`; the shared workflow permits that deployment only for `allowed-dispatch-actor`.

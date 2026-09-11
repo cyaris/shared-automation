@@ -57,6 +57,11 @@ permissions:
 
 jobs:
   deploy:
+    # The OIDC path needs an ID token, and a called workflow can only keep permissions its caller grants, so every
+    # caller grants this job `id-token: write` even when it deploys with access keys.
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
 
     steps:
