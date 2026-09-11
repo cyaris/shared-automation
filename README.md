@@ -8,7 +8,8 @@ then call the reusable implementation here with `uses: cyaris/shared-automation/
 
 The reusable workflow implementations guard manual `workflow_dispatch` runs. By default, they only allow the
 `cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
-release, upload, or deployment work happens. Rollup additionally accepts `github-actions[bot]` so the repository's
+release, upload, or deployment work happens. The guard checks the actor who started the run and the actor who
+re-ran it, so a re-run by anyone else is rejected too. Rollup additionally accepts `github-actions[bot]` so the repository's
 scheduled upstream-watch workflow can dispatch a rebuild when a tracked dependency changes, but only after verifying
 through the GitHub API that the supplied run reference is an authorized `upstream-watch.yml` run in the same
 repository that was active when GitHub created the Rollup run; this is time-bounded authorization of that run reference,
