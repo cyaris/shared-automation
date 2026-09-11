@@ -52,7 +52,7 @@
 
 - Keep reusable workflow implementations in `.github/workflows`.
 - Keep composite GitHub Actions in `.github/actions`.
-- Keep shared CI, rollup, auto-create-dev-PR, and auto-release implementation changes in this repository. Caller repositories should keep thin local wrapper workflows that define triggers, permissions, inputs, secrets, and repository-specific values before calling the reusable workflow here.
+- Keep shared AWS CDK deployment, CI, rollup, auto-create-dev-PR, and auto-release implementation changes in this repository. Caller repositories should keep thin local wrapper workflows that define triggers, permissions, inputs, secrets, and repository-specific values before calling the reusable workflow here.
 - Keep reusable workflow defaults general. Caller-specific commands, local dependency refs, bundle file lists, metadata refresh files, branch selections, S3 prefixes, and release naming or milestone overrides belong in caller workflow inputs or caller release-policy files.
 - First-party upstream refs should track the latest production branch by default. Reusable workflow and composite-action
   callers must use `cyaris/shared-automation` refs on `main`, including when a new downstream caller temporarily fails
