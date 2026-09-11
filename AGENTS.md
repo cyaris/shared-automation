@@ -52,7 +52,7 @@
 
 - Keep reusable workflow implementations in `.github/workflows`.
 - Keep composite GitHub Actions in `.github/actions`.
-- Keep shared CI, rollup, auto-create-dev-PR, and auto-release implementation changes in this repository. Caller repositories should keep thin local wrapper workflows that define triggers, permissions, inputs, secrets, and repository-specific values before calling the reusable workflow here.
+- Keep shared AWS CDK deployment, CI, rollup, auto-create-dev-PR, and auto-release implementation changes in this repository. Caller repositories should keep thin local wrapper workflows that define triggers, permissions, inputs, secrets, and repository-specific values before calling the reusable workflow here.
 - Keep reusable workflow defaults general. Caller-specific commands, local dependency refs, bundle file lists, metadata refresh files, branch selections, S3 prefixes, and release naming or milestone overrides belong in caller workflow inputs or caller release-policy files.
 - First-party upstream refs should track the latest production branch by default. Reusable workflow and composite-action
   callers must use `cyaris/shared-automation` refs on `main`, including when a new downstream caller temporarily fails
@@ -151,10 +151,11 @@
 - Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
 - Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
 - Keep private action and dependency access requirements documented in `README.md`.
-- Format Markdown pipe tables with exactly one space inside each cell boundary, such as `| Prop | Behavior |` and
-  `| --- | ---: |`. Start and end each row with `|`, without leading or trailing whitespace outside those pipes, and do
-  not add extra padding solely to align columns. Preserve required alignment markers such as `---:`, `:---`, and
-  `:---:`.
+- Keep every Markdown pipe table compact in source. This is required formatting, not a preference: use exactly one
+  space inside each cell boundary, as in `| Prop | Behavior |` and `| --- | ---: |`, and start and end each row with
+  `|` without whitespace outside those pipes. Never pad cells or lengthen separator dashes to align columns. Preserve
+  only required alignment markers such as `---:`, `:---`, and `:---:`. When editing a document for any reason,
+  preserve compact tables and restore compact formatting in every table touched by the change.
 - Downstream README files should link to this repository's workflow descriptions instead of repeating shared behavior.
   For each local wrapper, document only the applicable local trigger and branch behavior, working directory, skipped
   commands, destination or S3 prefix, bundle files and naming, dependency refs, policy overrides, and required local

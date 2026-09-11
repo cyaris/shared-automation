@@ -382,7 +382,7 @@ jobs:
 
     steps:
       - name: Validate manual dispatcher
-        if: ${{ github.event_name == 'workflow_dispatch' && github.actor != inputs['allowed-dispatch-actor'] && needs.resolve-inputs.outputs.automated_dispatch_verified != 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && (github.actor != inputs['allowed-dispatch-actor'] || github.triggering_actor != inputs['allowed-dispatch-actor']) && needs.resolve-inputs.outputs.automated_dispatch_verified != 'true' }}
         env:
           ALLOWED_DISPATCH_ACTOR: ${{ inputs['allowed-dispatch-actor'] }}
         run: |

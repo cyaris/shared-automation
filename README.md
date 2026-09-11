@@ -8,7 +8,8 @@ then call the reusable implementation here with `uses: cyaris/shared-automation/
 
 The reusable workflow implementations guard manual `workflow_dispatch` runs. By default, they only allow the
 `cyaris` GitHub actor to run manually dispatched workflows; another actor will fail immediately before any checkout,
-release, upload, or deployment work happens. Rollup additionally accepts `github-actions[bot]` so the repository's
+release, upload, or deployment work happens. The guard checks the actor who started the run and the actor who
+re-ran it, so a re-run by anyone else is rejected too. Rollup additionally accepts `github-actions[bot]` so the repository's
 scheduled upstream-watch workflow can dispatch a rebuild when a tracked dependency changes, but only after verifying
 through the GitHub API that the supplied run reference is an authorized `upstream-watch.yml` run in the same
 repository that was active when GitHub created the Rollup run; this is time-bounded authorization of that run reference,
@@ -83,6 +84,33 @@ policy. Release runs decide meaningful release milestones from the repository hi
 commit-prefix parsing.
 
 ## Workflows
+
+### `.github/workflows/aws-cdk-deploy.yml`
+
+Reusable AWS CDK deployment workflow for Node-based infrastructure packages. It installs the caller's locked
+dependencies, optionally synthesizes and tests the stack, authenticates to AWS, and runs `cdk deploy` with interactive
+approval disabled. Caller wrappers own their triggers and should invoke deployment only from a production branch when
+the infrastructure directory changes. A caller that also publishes application artifacts should make that publication
+depend on this workflow job so code cannot reach production before infrastructure it requires.
+
+The workflow accepts these inputs:
+
+- `allowed-dispatch-actor`, defaulting to `cyaris`
+- required `aws-region`
+- optional `aws-role-to-assume` for OIDC authentication
+- `node-version`, defaulting to `24`
+- `run-synth` and `run-test`, both defaulting to `true`
+- required `stack-name`
+- `working-directory`, defaulting to `infra`
+
+AWS OIDC is preferred. Every caller grants its reusable-workflow job `contents: read` and `id-token: write`, because
+the shared deploy job requests the ID token and a called workflow cannot request a permission its caller withholds. A
+caller that passes `aws-role-to-assume` stores the deployment role ARN in a repository variable. When the role input is
+empty, callers must forward `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. Missing
+credentials fail before checkout or deployment.
+
+This reusable workflow is not directly dispatchable from the GitHub Actions UI. A local caller may expose
+`workflow_dispatch`; the shared workflow permits that deployment only for `allowed-dispatch-actor`.
 
 ### `.github/workflows/auto-create-dev-pr.yml`
 

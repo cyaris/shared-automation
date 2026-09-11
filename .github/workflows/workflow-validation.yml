@@ -42,7 +42,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "$GITHUB_ACTOR" != "$ALLOWED_DISPATCH_ACTOR" ]]; then
+          if [[ "$GITHUB_ACTOR" != "$ALLOWED_DISPATCH_ACTOR" || "$GITHUB_TRIGGERING_ACTOR" != "$ALLOWED_DISPATCH_ACTOR" ]]; then
             printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
             exit 1
           fi

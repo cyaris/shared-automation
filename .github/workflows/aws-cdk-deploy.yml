@@ -1,0 +1,141 @@
+name: Shared AWS CDK deployment
+
+on:
+  workflow_call:
+    inputs:
+      allowed-dispatch-actor:
+        description: GitHub actor allowed to deploy through a workflow_dispatch caller.
+        required: false
+        type: string
+        default: cyaris
+      aws-region:
+        description: AWS region containing the stack.
+        required: true
+        type: string
+      aws-role-to-assume:
+        description: Optional AWS role ARN for OIDC authentication. If omitted, AWS access key secrets are used.
+        required: false
+        type: string
+        default: ""
+      node-version:
+        description: Node.js version used for the CDK package.
+        required: false
+        type: string
+        default: "24"
+      run-synth:
+        description: Run npm run synth before deployment.
+        required: false
+        type: boolean
+        default: true
+      run-test:
+        description: Run npm test before deployment.
+        required: false
+        type: boolean
+        default: true
+      stack-name:
+        description: CloudFormation stack name to deploy.
+        required: true
+        type: string
+      working-directory:
+        description: Directory containing the AWS CDK package and cdk.json.
+        required: false
+        type: string
+        default: infra
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        description: AWS access key used when aws-role-to-assume is omitted.
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        description: AWS secret key used when aws-role-to-assume is omitted.
+        required: false
+      AWS_SESSION_TOKEN:
+        description: Optional AWS session token used when aws-role-to-assume is omitted.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # The OIDC path needs an ID token, and a called workflow can only keep permissions its caller grants, so every
+    # caller grants this job `id-token: write` even when it deploys with access keys.
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate deployment request
+        env:
+          ALLOWED_DISPATCH_ACTOR: ${{ inputs.allowed-dispatch-actor }}
+          AWS_ACCESS_KEY_ID_INPUT: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_ROLE_TO_ASSUME: ${{ inputs.aws-role-to-assume }}
+          AWS_SECRET_ACCESS_KEY_INPUT: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          STACK_NAME: ${{ inputs.stack-name }}
+        run: |
+          set -euo pipefail
+
+          # A re-run keeps the original actor while the person who started it is the triggering actor.
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && ( "$GITHUB_ACTOR" != "$ALLOWED_DISPATCH_ACTOR" || "$GITHUB_TRIGGERING_ACTOR" != "$ALLOWED_DISPATCH_ACTOR" ) ]]; then
+            printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
+            exit 1
+          fi
+
+          if [[ ! "$STACK_NAME" =~ ^[A-Za-z][A-Za-z0-9-]*$ ]]; then
+            printf "Invalid CloudFormation stack name: %s\n" "$STACK_NAME" >&2
+            exit 1
+          fi
+
+          if [[ -z "$AWS_ROLE_TO_ASSUME" && ( -z "$AWS_ACCESS_KEY_ID_INPUT" || -z "$AWS_SECRET_ACCESS_KEY_INPUT" ) ]]; then
+            printf "AWS CDK deployment requires aws-role-to-assume or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.\n" >&2
+            exit 1
+          fi
+
+      - name: Checkout caller repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+      - name: Install infrastructure dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: npm ci
+
+      - name: Synthesize infrastructure
+        if: inputs.run-synth
+        working-directory: ${{ inputs.working-directory }}
+        run: npm run synth
+
+      - name: Test infrastructure
+        if: inputs.run-test
+        working-directory: ${{ inputs.working-directory }}
+        run: npm test
+
+      - name: Configure AWS credentials with OIDC
+        if: inputs.aws-role-to-assume != ''
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
+        with:
+          aws-region: ${{ inputs.aws-region }}
+          role-session-name: cdk-deploy-${{ github.run_id }}
+          role-to-assume: ${{ inputs.aws-role-to-assume }}
+
+      - name: Configure AWS credentials with access keys
+        if: inputs.aws-role-to-assume == ''
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-region: ${{ inputs.aws-region }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Deploy infrastructure
+        env:
+          STACK_NAME: ${{ inputs.stack-name }}
+        working-directory: ${{ inputs.working-directory }}
+        run: npx cdk deploy "$STACK_NAME" --require-approval never
