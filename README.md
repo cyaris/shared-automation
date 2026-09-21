@@ -370,8 +370,9 @@ inputs and validating the resulting dataset.
 
 Reusable Rollup workflow for Svelte apps that need both shared CI validation and embedded bundle uploads. It resolves
 standard `svelte-lib` refs and local dependency refs to exact commit SHAs at run time, runs the shared CI workflow first,
-then runs the shared rollup upload action. Caller wrappers must limit triggers to manual dispatches and pushes to `dev`,
-`main`, or `master`. Each caller still owns:
+then runs the shared rollup upload action. Caller wrappers should run on manual dispatch and production-branch pushes;
+ordinary `dev` pushes should call the separate shared CI workflow. As a migration safeguard, the reusable workflow
+skips the upload job when a legacy caller invokes it from a `dev` push. Each caller still owns:
 
 - manual input declarations
 - S3 destinations
@@ -382,9 +383,10 @@ then runs the shared rollup upload action. Caller wrappers must limit triggers t
 `deployment-enabled` defaults to `true`. A caller whose deployment target is not ready can set it to `false`; shared CI
 still runs, while only the upload job is skipped.
 
-The run's branch determines what each run uploads and invalidates:
+The run's branch determines what each upload-capable run uploads and invalidates:
 
-- Production-branch runs upload unprefixed `bundle.*` objects, while `dev` runs upload staged `dev_bundle.*` objects.
+- Production-branch pushes and dispatches upload unprefixed `bundle.*` objects, while manual or trusted upstream-watch
+  dispatches on `dev` upload staged `dev_bundle.*` objects.
 - `production-files` maps repository-root files to explicit S3 keys, and those files upload only from `main` or
   `master`.
 - CloudFront invalidation runs on every branch, so a `dev` run also invalidates the configured paths.

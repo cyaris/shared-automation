@@ -187,8 +187,9 @@
   and do not exaggerate routine maintenance as user-facing work.
 - Treat upstream automation, shared workflow reference, dependency-pin, Renovate, and release-policy maintenance as
   non-release work unless it changes repository user behavior or a published package/runtime API.
-- For rollup upload callers, pushes or manual dispatches from `main` or `master` should run production uploads with
-  unprefixed bundle names. Pushes or manual dispatches from `dev` should run staged uploads with `dev_bundle.*` names.
+- For rollup upload callers, ordinary `dev` pushes should run a separate shared CI wrapper instead of Rollup. Pushes
+  from `main` or `master` should run production uploads with unprefixed bundle names. Manual or trusted upstream-watch
+  dispatches from `dev` should run staged uploads with `dev_bundle.*` names.
 - When a Rollup caller needs a temporary deployment-readiness gate, pass the shared `deployment-enabled` input. Keep the
   caller job active so shared CI still runs, and apply the gate only to the shared upload job.
 - Do not trigger GitHub Actions workflows from pull-request events. Run pre-merge CI, build, Pages, and
