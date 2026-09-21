@@ -119,7 +119,7 @@ jobs:
 
       - name: Configure AWS credentials with OIDC
         if: inputs.aws-role-to-assume != ''
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           aws-region: ${{ inputs.aws-region }}
           role-session-name: cdk-deploy-${{ github.run_id }}
@@ -127,7 +127,7 @@ jobs:
 
       - name: Configure AWS credentials with access keys
         if: inputs.aws-role-to-assume == ''
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-region: ${{ inputs.aws-region }}

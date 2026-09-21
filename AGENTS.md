@@ -151,11 +151,11 @@
 - Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
 - Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
 - Keep private action and dependency access requirements documented in `README.md`.
-- Keep every Markdown pipe table compact in source. This is required formatting, not a preference: use exactly one
-  space inside each cell boundary, as in `| Prop | Behavior |` and `| --- | ---: |`, and start and end each row with
-  `|` without whitespace outside those pipes. Never pad cells or lengthen separator dashes to align columns. Preserve
-  only required alignment markers such as `---:`, `:---`, and `:---:`. When editing a document for any reason,
-  preserve compact tables and restore compact formatting in every table touched by the change.
+- Keep every Markdown pipe table compact in source. This is required formatting, not a preference: separate columns
+  with exactly one space on either side of each pipe, as in `Prop | Behavior` and `--- | ---:`, with no leading or
+  trailing pipe. Never pad cells or lengthen separator dashes to align columns. Preserve only required alignment
+  markers such as `---:`, `:---`, and `:---:`. When editing a document for any reason, preserve compact tables and
+  restore compact formatting in every table touched by the change.
 - Downstream README files should link to this repository's workflow descriptions instead of repeating shared behavior.
   For each local wrapper, document only the applicable local trigger and branch behavior, working directory, skipped
   commands, destination or S3 prefix, bundle files and naming, dependency refs, policy overrides, and required local
@@ -187,8 +187,9 @@
   and do not exaggerate routine maintenance as user-facing work.
 - Treat upstream automation, shared workflow reference, dependency-pin, Renovate, and release-policy maintenance as
   non-release work unless it changes repository user behavior or a published package/runtime API.
-- For rollup upload callers, pushes or manual dispatches from `main` or `master` should run production uploads with
-  unprefixed bundle names. Pushes or manual dispatches from `dev` should run staged uploads with `dev_bundle.*` names.
+- For rollup upload callers, ordinary `dev` pushes should run a separate shared CI wrapper instead of Rollup. Pushes
+  from `main` or `master` should run production uploads with unprefixed bundle names. Manual or trusted upstream-watch
+  dispatches from `dev` should run staged uploads with `dev_bundle.*` names.
 - When a Rollup caller needs a temporary deployment-readiness gate, pass the shared `deployment-enabled` input. Keep the
   caller job active so shared CI still runs, and apply the gate only to the shared upload job.
 - Do not trigger GitHub Actions workflows from pull-request events. Run pre-merge CI, build, Pages, and

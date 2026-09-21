@@ -368,7 +368,7 @@ jobs:
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
   rollup-upload:
-    if: inputs.deployment-enabled
+    if: ${{ inputs.deployment-enabled && (github.event_name != 'push' || github.ref_name != 'dev') }}
     needs:
       - node-package-ci
       - resolve-inputs
