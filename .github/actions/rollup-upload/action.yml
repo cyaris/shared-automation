@@ -349,7 +349,7 @@ runs:
           name="${spec%%:*}"
           value="${spec#*:}"
 
-          if [[ "$name" == "$spec" || -z "$name" || -z "${value// /}" ]]; then
+          if [[ "$name" == "$spec" || -z "$name" || -z "${value//[[:space:]]/}" ]]; then
             printf "Invalid cache-control override spec: %s\n" "$spec" >&2
             exit 1
           fi
