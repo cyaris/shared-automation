@@ -442,6 +442,7 @@ Important inputs:
   - `manual-dry-run`
   - `sync-dist-extras`
   - `cache-control`
+  - `cache-control-overrides`
   - `metadata-refresh-files`
   - `svelte-lib-repository`
   - `vite-public-environment`
@@ -450,6 +451,11 @@ Important inputs:
 - Shared dependency input: `local-dependency-repositories` for dependencies used by both CI and upload
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 - `source-run-id`, which upstream-watch's dispatch call populates automatically; not intended for manual use
+
+Every uploaded object receives `cache-control` unless a `cache-control-overrides` line names it. Each line is
+`name:cache-control`, where `name` is a `bundle-files` path, which covers its `dev_` upload too, or a
+`production-files` S3 key. An override that matches no listed file fails the upload. Overrides do not apply to
+`sync-dist-extras` or `metadata-refresh-files`.
 
 The `github-actions[bot]` dispatch exception only applies when `source-run-id` resolves, through the GitHub API, to an
 authorized `upstream-watch.yml` run in the same repository and the Rollup run's creation time falls within the source
