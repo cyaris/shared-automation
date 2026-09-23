@@ -71,6 +71,11 @@ on:
         required: false
         type: string
         default: no-cache, max-age=0, must-revalidate
+      cache-control-overrides:
+        description: Optional newline-separated name:cache-control specs that replace cache-control for one bundle-files path or production-files S3 key.
+        required: false
+        type: string
+        default: ""
       metadata-refresh-files:
         description: Optional newline-separated S3 object specs as key:content-type to refresh metadata in place.
         required: false
@@ -460,6 +465,7 @@ jobs:
           dry-run: ${{ needs.resolve-inputs.outputs.dry_run == 'true' }}
           sync-dist-extras: ${{ inputs.sync-dist-extras }}
           cache-control: ${{ inputs.cache-control }}
+          cache-control-overrides: ${{ inputs.cache-control-overrides }}
           metadata-refresh-files: ${{ inputs.metadata-refresh-files }}
           vite-public-environment: ${{ inputs.vite-public-environment }}
           node-version: ${{ inputs.node-version }}
