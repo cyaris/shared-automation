@@ -3,7 +3,7 @@
 ## Scope And Inheritance
 
 - Repositories that call workflows or actions from `cyaris/shared-automation` inherit this `AGENTS.md` as the source of truth for shared GitHub Actions, reusable workflow wrappers, release policy, dispatch, automation documentation, and general README/Markdown documentation style. Repositories with Python or SQL may also opt into the shared language conventions below.
-- Treat the automation rules in this file as scoped to automation behavior, the general README/Markdown style rules in the Documentation section as scoped to any caller repository's README and Markdown documentation, and the Python/SQL rules as scoped only to repositories whose local `AGENTS.md` explicitly inherits them. Project-specific build commands, dependency refs, bundle files, S3 prefixes, release naming, milestone wording, deployment targets, and project-specific documentation content belong in the caller repository's own `AGENTS.md` or `.github/release-policy.yml`.
+- Treat the automation rules in this file as scoped to automation behavior, the general README/Markdown style rules in the Documentation section as scoped to any caller repository's README and Markdown documentation, the Commit Integrity rules as scoped to every commit in any caller repository, and the Python/SQL rules as scoped only to repositories whose local `AGENTS.md` explicitly inherits them. Project-specific build commands, dependency refs, bundle files, S3 prefixes, release naming, milestone wording, deployment targets, and project-specific documentation content belong in the caller repository's own `AGENTS.md` or `.github/release-policy.yml`.
 - When a caller repository inherits these rules, keep a local `AGENTS.md` note that points back to `../shared-automation/AGENTS.md` for the applicable shared conventions, then list only caller-specific details that differ from the shared defaults.
 
 ## Shared Python And SQL Conventions
@@ -187,13 +187,28 @@
   and do not exaggerate routine maintenance as user-facing work.
 - Treat upstream automation, shared workflow reference, dependency-pin, Renovate, and release-policy maintenance as
   non-release work unless it changes repository user behavior or a published package/runtime API.
-- For rollup upload callers, ordinary `dev` pushes should run a separate shared CI wrapper instead of Rollup. Pushes
-  from `main` or `master` should run production uploads with unprefixed bundle names. Manual or trusted upstream-watch
-  dispatches from `dev` should run staged uploads with `dev_bundle.*` names.
+- For rollup upload callers, `dev` pushes should not run Rollup. Pushes from `main` or `master` should run production
+  uploads with unprefixed bundle names. Manual or trusted upstream-watch dispatches from `dev` should run staged uploads
+  with `dev_bundle.*` names.
 - When a Rollup caller needs a temporary deployment-readiness gate, pass the shared `deployment-enabled` input. Keep the
   caller job active so shared CI still runs, and apply the gate only to the shared upload job.
-- Do not trigger GitHub Actions workflows from pull-request events. Run pre-merge CI, build, Pages, and
-  workflow-validation checks from `dev` pushes, and retain production-branch push checks after merge.
+- Do not trigger GitHub Actions workflows from pull-request events. `auto-create-dev-pr` is the only workflow that runs
+  automatically on `dev` pushes; run pre-merge CI, build, Pages, and workflow-validation checks on `dev` through manual
+  dispatch, and retain production-branch push checks after merge.
+
+## Commit Integrity
+
+- Assume another session may be editing the same working tree at the same time. A commit must hold exactly the
+  changes its session made, and never another session's.
+- Stage by path, never with `git add -A`, `git add .`, or `git commit -a`. Before staging a file, read its
+  `git diff`: if any hunk is not yours, stage only your hunks, or leave the file and tell the user. After staging,
+  `git diff --cached --stat` must list only your files, since another session may have staged something too.
+- Never stash, reset, restore, or check out a file you did not change, because doing so moves another session's
+  uncommitted work.
+- Right after committing, compare `git show --stat HEAD` with the files you meant to commit, and confirm that `HEAD`'s
+  parent is the commit you started from. If your change is missing, landed in another session's commit, or shares
+  your commit with work you did not make, stop and tell the user before pushing. Never rewrite a pushed commit to
+  fix this.
 
 ## Release Management
 

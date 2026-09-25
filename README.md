@@ -239,7 +239,7 @@ approving the plan.
 ### `.github/workflows/ci-self.yml`
 
 Local workflow for this repository's own `.github/scripts` package. It runs through manual dispatch or on pushes to
-`dev` and `main` that touch:
+`main` that touch:
 
 - `.github/scripts/**`
 - `.github/workflows/ci-self.yml`
@@ -276,7 +276,6 @@ name: CI
 on:
   push:
     branches:
-      - dev
       - main
   workflow_dispatch:
 
@@ -334,7 +333,6 @@ name: Backend CI
 on:
   push:
     branches:
-      - dev
       - main
     paths:
       - "backend/**"
@@ -370,9 +368,9 @@ inputs and validating the resulting dataset.
 
 Reusable Rollup workflow for Svelte apps that need both shared CI validation and embedded bundle uploads. It resolves
 standard `svelte-lib` refs and local dependency refs to exact commit SHAs at run time, runs the shared CI workflow first,
-then runs the shared rollup upload action. Caller wrappers should run on manual dispatch and production-branch pushes;
-ordinary `dev` pushes should call the separate shared CI workflow. As a migration safeguard, the reusable workflow
-skips the upload job when a legacy caller invokes it from a `dev` push. Each caller still owns:
+then runs the shared rollup upload action. Caller wrappers should run on manual dispatch and production-branch pushes,
+not on `dev` pushes. As a migration safeguard, the reusable workflow skips the upload job when a legacy caller invokes
+it from a `dev` push. Each caller still owns:
 
 - manual input declarations
 - S3 destinations
@@ -567,7 +565,6 @@ name: Workflow validation
 on:
   push:
     branches:
-      - dev
       - main
     paths:
       - ".github/release-policy.yml"
