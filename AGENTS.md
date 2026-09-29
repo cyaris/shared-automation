@@ -196,6 +196,22 @@
   automatically on `dev` pushes; run pre-merge CI, build, Pages, and workflow-validation checks on `dev` through manual
   dispatch, and retain production-branch push checks after merge.
 
+## Pull Request External Configuration Handoffs
+
+- When a pull request depends on configuration or approval that cannot be committed to the repository, put a prominent
+  caution in the pull-request description before its merge or deployment instructions. This includes repository,
+  organization, or environment variables and secrets; API credentials and tokens; cloud projects, billing, identities,
+  permissions, services, and resources; OAuth applications, origins, and callback URLs; DNS and provider-dashboard
+  settings; third-party approval; paid-plan requirements; production migrations; and other manual external state.
+- Make the caution an actionable inventory. Name every required item exactly, identify where it must be configured,
+  distinguish public configuration from secrets, state prerequisites and required ordering, explain how to verify the
+  resulting contract without revealing secret values, and state what remains unavailable or fails while an item is
+  missing. Never put a credential, token, private key, or other secret value in the pull request.
+- Separate completed external setup from pending work and include verification evidence for completed items. Keep an
+  activation-dependent pull request explicitly blocked while required external setup or verification remains pending,
+  and update the caution as each item is completed so later maintainers do not repeat a destructive step or assume that
+  committed workflow or migration files changed the external system.
+
 ## Commit Integrity
 
 - Assume another session may be editing the same working tree at the same time. A commit must hold exactly the
