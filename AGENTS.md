@@ -3,8 +3,12 @@
 ## Scope And Inheritance
 
 - Repositories that call workflows or actions from `cyaris/shared-automation` inherit this `AGENTS.md` as the source of truth for shared GitHub Actions, reusable workflow wrappers, release policy, dispatch, automation documentation, and general README/Markdown documentation style. Repositories with Python or SQL may also opt into the shared language conventions below.
-- Treat the automation rules in this file as scoped to automation behavior, the general README/Markdown style rules in the Documentation section as scoped to any caller repository's README and Markdown documentation, the Commit Integrity rules as scoped to every commit in any caller repository, and the Python/SQL rules as scoped only to repositories whose local `AGENTS.md` explicitly inherits them. Project-specific build commands, dependency refs, bundle files, S3 prefixes, release naming, milestone wording, deployment targets, and project-specific documentation content belong in the caller repository's own `AGENTS.md` or `.github/release-policy.yml`.
+- Treat the automation rules in this file as scoped to automation behavior, the Agent And Skill Execution and Commit Integrity rules as scoped to every task in any caller repository, the general README/Markdown style rules in the Documentation section as scoped to any caller repository's README and Markdown documentation, and the Python/SQL rules as scoped only to repositories whose local `AGENTS.md` explicitly inherits them. Project-specific build commands, dependency refs, bundle files, S3 prefixes, release naming, milestone wording, deployment targets, and project-specific documentation content belong in the caller repository's own `AGENTS.md` or `.github/release-policy.yml`.
 - When a caller repository inherits these rules, keep a local `AGENTS.md` note that points back to `../shared-automation/AGENTS.md` for the applicable shared conventions, then list only caller-specific details that differ from the shared defaults.
+
+## Agent And Skill Execution
+
+- Execute a skill's instructions in the active primary agent session, using that session's model and compute. Treat a skill as portable instruction text: its location under Claude, Codex, or another agent does not authorize launching that vendor's CLI, subprocess, remote session, or separate agent runtime. Naming a skill from another agent ecosystem requests the skill's workflow, not that ecosystem's compute. Use separate agent compute only when the user explicitly asks to run that separate agent or model rather than merely naming its skill.
 
 ## Shared Python And SQL Conventions
 
