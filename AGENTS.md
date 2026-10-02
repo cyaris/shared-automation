@@ -152,6 +152,12 @@
   project already tracks work, such as a GitHub issue or the README note that already records it, because AGENTS.md
   states how the repository is maintained rather than what is still outstanding.
 - In Markdown files, always format the literal as `null`.
+- Before completing a change that adds or changes a user-followable link, verify the real target rather than relying
+  on the URL's appearance. Check an internal destination in every route implementation that serves it. For an
+  external destination, make a live request that follows redirects and confirm the final page is the intended one, not
+  merely a non-404 response. Add focused regression coverage for the stable route or URL. If automation is blocked by
+  login, bot protection, or another access restriction, perform and report the required manual check instead of
+  claiming the link was verified.
 - Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
 - Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
 - Keep private action and dependency access requirements documented in `README.md`.
@@ -159,7 +165,9 @@
   with exactly one space on either side of each pipe, as in `Prop | Behavior` and `--- | ---:`, with no leading or
   trailing pipe. Never pad cells or lengthen separator dashes to align columns. Preserve only required alignment
   markers such as `---:`, `:---`, and `:---:`. When editing a document for any reason, preserve compact tables and
-  restore compact formatting in every table touched by the change.
+  restore compact formatting in every table touched by the change. Prettier pads every pipe table it formats, so never
+  run Prettier, or any other formatter that rewrites tables, on a Markdown file. Keep Markdown out of a repository's
+  `format` scripts and list it in `.prettierignore` so a direct `prettier --write` on a document is a no-op.
 - Downstream README files should link to this repository's workflow descriptions instead of repeating shared behavior.
   For each local wrapper, document only the applicable local trigger and branch behavior, working directory, skipped
   commands, destination or S3 prefix, bundle files and naming, dependency refs, policy overrides, and required local
@@ -265,7 +273,10 @@
   unambiguous identified set of pull requests. Requests to fix, finish, deploy, publish, investigate, make checks green,
   or continue do not authorize a merge; neither do green checks, review completion, mergeability, or prior authorization
   for a different pull request. When a pull request is ready without explicit merge authorization, leave it open and
-  report its readiness.
+  report its readiness. The instruction must say **merge** and name the pull request by number or URL. A reply such as
+  "go for it," "proceed," or "ship it" does not authorize a merge, even right after the assistant proposes merging a
+  specific pull request, and permission to commit or push is not permission to merge. Ask for that instruction when a
+  deployment needs a merge.
 - Keep `.github/workflows/workflow-validation.yml` aligned with workflow and composite-action changes so `actionlint` and
   `zizmor` run when automation files change.
 - Add workflow-validation callers to dependent repositories when they own meaningful local workflow logic, such as
