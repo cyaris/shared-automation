@@ -29,8 +29,11 @@ on:
         type: string
         default: cyaris
     secrets:
+      CHECKOUT_TOKEN:
+        description: Token that can read and write repository variables. Required unless RELEASE_TOKEN can.
+        required: false
       RELEASE_TOKEN:
-        description: Optional token that can create pull requests when github.token is restricted.
+        description: Optional token that can create pull requests when github.token is restricted, and the fallback for writing repository variables.
         required: false
 
 permissions:
@@ -61,26 +64,45 @@ jobs:
         env:
           DEFAULT_BRANCH: ${{ inputs.default-branch || github.event.repository.default_branch }}
           DEV_BRANCH: ${{ inputs.dev-branch }}
+          DEV_PR_OPEN: ${{ vars.DEV_PR_OPEN }}
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           PR_BODY: ${{ inputs.body }}
           PR_TITLE: ${{ inputs.title }}
           REPOSITORY: ${{ github.repository }}
+          VARIABLE_TOKEN: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
+
+          # Callers skip dev pushes while DEV_PR_OPEN is true, so record whether a dev pull request is open.
+          record_dev_pr_open() {
+            if [[ "$DEV_PR_OPEN" == "$1" ]]; then
+              return
+            fi
+
+            if [[ -z "$VARIABLE_TOKEN" ]]; then
+              printf "Recording DEV_PR_OPEN requires CHECKOUT_TOKEN or RELEASE_TOKEN with repository variable write access.\n" >&2
+              exit 1
+            fi
+
+            GH_TOKEN="$VARIABLE_TOKEN" gh variable set DEV_PR_OPEN --repo "$REPOSITORY" --body "$1"
+            printf "Set DEV_PR_OPEN to %s.\n" "$1"
+          }
 
           if [[ "$DEFAULT_BRANCH" == "$DEV_BRANCH" ]]; then
             printf "The default branch is dev, so there is no separate base branch for a pull request.\n"
             exit 0
           fi
 
-          # Most dev pushes land while the pull request is already open, so check that first.
+          # Most runs find the pull request already open, so check that first.
           if [[ "$(gh pr list --repo "$REPOSITORY" --state open --base "$DEFAULT_BRANCH" --head "$DEV_BRANCH" --json number --jq 'length')" != "0" ]]; then
             printf "An open pull request from dev to %s already exists.\n" "$DEFAULT_BRANCH"
+            record_dev_pr_open true
             exit 0
           fi
 
           if [[ "$(gh api "repos/${REPOSITORY}/compare/${DEFAULT_BRANCH}...${DEV_BRANCH}" --jq '.ahead_by')" == "0" ]]; then
             printf "dev has no commits ahead of %s.\n" "$DEFAULT_BRANCH"
+            record_dev_pr_open false
             exit 0
           fi
 
@@ -98,3 +120,4 @@ jobs:
             --head "$DEV_BRANCH" \
             --title "$PR_TITLE" \
             --body "$PR_BODY"
+          record_dev_pr_open true

@@ -179,8 +179,10 @@
 - Do not disable a shared CI standard-script flag (`run-format`, `run-lint`, `run-check`, `run-build`) unless the caller
   defines no such npm script, and document that reason where the wrapper is described. A caller that defines the script
   runs it; skipping one silently removes coverage every other caller has.
-- Auto-create-dev-pr callers with a repository `RELEASE_TOKEN` secret should pass that secret explicitly to the shared
-  workflow. Use that token for trusted user or agent-authored dev pull requests.
+- Auto-create-dev-pr callers should pass `CHECKOUT_TOKEN` so the shared workflow can write the `DEV_PR_OPEN`
+  repository variable, and should pass a repository `RELEASE_TOKEN` secret, when present, for trusted user or
+  agent-authored dev pull requests. Callers must also trigger on production-branch pushes and keep the shared
+  `DEV_PR_OPEN` job-level skip so `dev` pushes do not start a runner while a dev pull request is open.
 - Workflows must fail clearly when a requested feature requires credentials, secrets, repository variables, external
   permissions, or paid services that are not configured. Apply this to dry-run modes too: a dry run may avoid external
   writes, but it should still prove that required credentials exist unless the feature is explicitly documented as

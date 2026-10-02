@@ -117,7 +117,7 @@ This reusable workflow is not directly dispatchable from the GitHub Actions UI. 
 Reusable workflow for opening a pull request from `dev` to the caller repository default branch after changes are pushed
 to `dev`, when no such pull request already exists.
 
-Typical caller wrapper:
+Typical caller wrapper (list `master` instead of `main` when that is the default branch):
 
 ```yaml
 name: Auto-create dev pull request
@@ -126,6 +126,8 @@ on:
   push:
     branches:
       - dev
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -133,17 +135,27 @@ permissions:
 
 jobs:
   auto-create-dev-pr:
+    if: ${{ github.event_name != 'push' || github.ref_name != 'dev' || vars.DEV_PR_OPEN != 'true' }}
     uses: cyaris/shared-automation/.github/workflows/auto-create-dev-pr.yml@main
     secrets:
+      CHECKOUT_TOKEN: ${{ secrets.CHECKOUT_TOKEN }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 ```
 
-The reusable job serializes runs with a repository/branch-specific concurrency group. This queues overlapping pushes
-before the pull request existence check and creation step run.
+The workflow records whether a dev pull request is open in the caller's `DEV_PR_OPEN` repository variable, and the
+caller's job-level `if` skips `dev` pushes while it is `true`. A skipped job never starts a runner, so only the first
+`dev` push after a merge runs the workflow. Each run sets the variable from the current state:
 
-GitHub has no event for "the first `dev` push since the last pull request merged", so the caller still triggers on every
-`dev` push. Each run is kept to a few API calls with no checkout: it exits as soon as it finds an open pull request,
-then uses the compare API to skip when `dev` has no commits ahead of the base branch.
+- `true` after finding or creating an open pull request from `dev`
+- `false` when `dev` has no commits ahead of the base branch
+
+The production-branch push trigger resets the variable after the pull request merges, and creates a new pull request
+right away if `dev` already has newer commits. If a dev pull request is closed without merging, `DEV_PR_OPEN` stays
+`true` until the next production-branch push or a manual dispatch of the caller, which always runs the workflow.
+
+Each run uses only GitHub API calls with no checkout, and checks for an open pull request before comparing branches. The
+reusable job serializes runs with a repository/branch-specific concurrency group, so overlapping pushes queue before the
+pull request existence check and creation step run.
 
 Important inputs:
 
@@ -152,15 +164,17 @@ Important inputs:
 - `title` and `body` for caller-specific pull request text
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 
-Optional secret:
+Secrets:
 
-- `RELEASE_TOKEN` for trusted user or agent-authored pull requests. When callers pass this secret, the workflow uses it
-  for branch fetches and `gh pr create`.
+- `CHECKOUT_TOKEN` for writing the `DEV_PR_OPEN` repository variable. The workflow falls back to `RELEASE_TOKEN`, and
+  fails with an explicit error when neither token is passed and the variable needs to change.
+- `RELEASE_TOKEN` (optional) for trusted user or agent-authored pull requests. When callers pass this secret, the
+  workflow uses it for `gh pr create`.
 
 ### `.github/workflows/auto-create-dev-pr-self.yml`
 
-Local workflow for this repository. It runs on pushes to `dev`, then delegates pull request creation to
-`.github/workflows/auto-create-dev-pr.yml`.
+Local workflow for this repository. It runs on pushes to `dev` and `main` and on manual dispatch, skips `dev` pushes
+while `DEV_PR_OPEN` is `true`, then delegates pull request creation to `.github/workflows/auto-create-dev-pr.yml`.
 
 ### `.github/workflows/auto-release-self.yml`
 
