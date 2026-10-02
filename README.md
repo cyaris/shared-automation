@@ -141,6 +141,10 @@ jobs:
 The reusable job serializes runs with a repository/branch-specific concurrency group. This queues overlapping pushes
 before the pull request existence check and creation step run.
 
+GitHub has no event for "the first `dev` push since the last pull request merged", so the caller still triggers on every
+`dev` push. Each run is kept to a few API calls with no checkout: it exits as soon as it finds an open pull request,
+then uses the compare API to skip when `dev` has no commits ahead of the base branch.
+
 Important inputs:
 
 - `default-branch`, defaulting to the caller repository default branch
