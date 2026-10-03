@@ -29,8 +29,11 @@ on:
         type: string
         default: cyaris
     secrets:
+      CHECKOUT_TOKEN:
+        description: Token that can read and write repository variables. Required unless RELEASE_TOKEN can.
+        required: false
       RELEASE_TOKEN:
-        description: Optional token that can create pull requests when github.token is restricted.
+        description: Optional token that can create pull requests when github.token is restricted, and the fallback for writing repository variables.
         required: false
 
 permissions:
@@ -44,6 +47,7 @@ jobs:
       cancel-in-progress: false
 
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Validate manual dispatcher
@@ -56,28 +60,32 @@ jobs:
           printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
           exit 1
 
-      - name: Checkout repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
       - name: Create pull request if needed
         env:
           DEFAULT_BRANCH: ${{ inputs.default-branch || github.event.repository.default_branch }}
           DEV_BRANCH: ${{ inputs.dev-branch }}
-          FETCH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          DEV_PR_OPEN: ${{ vars.DEV_PR_OPEN }}
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
           PR_BODY: ${{ inputs.body }}
           PR_TITLE: ${{ inputs.title }}
           REPOSITORY: ${{ github.repository }}
+          VARIABLE_TOKEN: ${{ secrets.CHECKOUT_TOKEN || secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
 
-          git_fetch_origin() {
-            local auth_header
-            auth_header="$(printf 'x-access-token:%s' "$FETCH_TOKEN" | base64 | tr -d '\n')"
-            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" fetch "$@"
+          # Callers skip dev pushes while DEV_PR_OPEN is true, so record whether a dev pull request is open.
+          record_dev_pr_open() {
+            if [[ "$DEV_PR_OPEN" == "$1" ]]; then
+              return
+            fi
+
+            if [[ -z "$VARIABLE_TOKEN" ]]; then
+              printf "Recording DEV_PR_OPEN requires CHECKOUT_TOKEN or RELEASE_TOKEN with repository variable write access.\n" >&2
+              exit 1
+            fi
+
+            GH_TOKEN="$VARIABLE_TOKEN" gh variable set DEV_PR_OPEN --repo "$REPOSITORY" --body "$1"
+            printf "Set DEV_PR_OPEN to %s.\n" "$1"
           }
 
           if [[ "$DEFAULT_BRANCH" == "$DEV_BRANCH" ]]; then
@@ -85,17 +93,16 @@ jobs:
             exit 0
           fi
 
-          git_fetch_origin --no-tags origin \
-            "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" \
-            "+refs/heads/${DEV_BRANCH}:refs/remotes/origin/${DEV_BRANCH}"
-
-          if [[ "$(git rev-list --count "origin/${DEFAULT_BRANCH}..origin/${DEV_BRANCH}")" == "0" ]]; then
-            printf "dev has no commits ahead of %s.\n" "$DEFAULT_BRANCH"
+          # Most runs find the pull request already open, so check that first.
+          if [[ "$(gh pr list --repo "$REPOSITORY" --state open --base "$DEFAULT_BRANCH" --head "$DEV_BRANCH" --json number --jq 'length')" != "0" ]]; then
+            printf "An open pull request from dev to %s already exists.\n" "$DEFAULT_BRANCH"
+            record_dev_pr_open true
             exit 0
           fi
 
-          if [[ "$(gh pr list --repo "$REPOSITORY" --state open --base "$DEFAULT_BRANCH" --head "$DEV_BRANCH" --json number --jq 'length')" != "0" ]]; then
-            printf "An open pull request from dev to %s already exists.\n" "$DEFAULT_BRANCH"
+          if [[ "$(gh api "repos/${REPOSITORY}/compare/${DEFAULT_BRANCH}...${DEV_BRANCH}" --jq '.ahead_by')" == "0" ]]; then
+            printf "dev has no commits ahead of %s.\n" "$DEFAULT_BRANCH"
+            record_dev_pr_open false
             exit 0
           fi
 
@@ -113,3 +120,4 @@ jobs:
             --head "$DEV_BRANCH" \
             --title "$PR_TITLE" \
             --body "$PR_BODY"
+          record_dev_pr_open true

@@ -16,7 +16,6 @@ on:
         default: cyaris
   push:
     branches:
-      - dev
       - main
     paths:
       - ".github/actions/**"

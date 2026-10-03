@@ -3,8 +3,12 @@
 ## Scope And Inheritance
 
 - Repositories that call workflows or actions from `cyaris/shared-automation` inherit this `AGENTS.md` as the source of truth for shared GitHub Actions, reusable workflow wrappers, release policy, dispatch, automation documentation, and general README/Markdown documentation style. Repositories with Python or SQL may also opt into the shared language conventions below.
-- Treat the automation rules in this file as scoped to automation behavior, the general README/Markdown style rules in the Documentation section as scoped to any caller repository's README and Markdown documentation, and the Python/SQL rules as scoped only to repositories whose local `AGENTS.md` explicitly inherits them. Project-specific build commands, dependency refs, bundle files, S3 prefixes, release naming, milestone wording, deployment targets, and project-specific documentation content belong in the caller repository's own `AGENTS.md` or `.github/release-policy.yml`.
+- Treat the automation rules in this file as scoped to automation behavior, the Agent And Skill Execution and Commit Integrity rules as scoped to every task in any caller repository, the general README/Markdown style rules in the Documentation section as scoped to any caller repository's README and Markdown documentation, and the Python/SQL rules as scoped only to repositories whose local `AGENTS.md` explicitly inherits them. Project-specific build commands, dependency refs, bundle files, S3 prefixes, release naming, milestone wording, deployment targets, and project-specific documentation content belong in the caller repository's own `AGENTS.md` or `.github/release-policy.yml`.
 - When a caller repository inherits these rules, keep a local `AGENTS.md` note that points back to `../shared-automation/AGENTS.md` for the applicable shared conventions, then list only caller-specific details that differ from the shared defaults.
+
+## Agent And Skill Execution
+
+- Execute a skill's instructions in the active primary agent session, using that session's model and compute. Treat a skill as portable instruction text: its location under Claude, Codex, or another agent does not authorize launching that vendor's CLI, subprocess, remote session, or separate agent runtime. Naming a skill from another agent ecosystem requests the skill's workflow, not that ecosystem's compute. Use separate agent compute only when the user explicitly asks to run that separate agent or model rather than merely naming its skill.
 
 ## Shared Python And SQL Conventions
 
@@ -148,6 +152,12 @@
   project already tracks work, such as a GitHub issue or the README note that already records it, because AGENTS.md
   states how the repository is maintained rather than what is still outstanding.
 - In Markdown files, always format the literal as `null`.
+- Before completing a change that adds or changes a user-followable link, verify the real target rather than relying
+  on the URL's appearance. Check an internal destination in every route implementation that serves it. For an
+  external destination, make a live request that follows redirects and confirm the final page is the intended one, not
+  merely a non-404 response. Add focused regression coverage for the stable route or URL. If automation is blocked by
+  login, bot protection, or another access restriction, perform and report the required manual check instead of
+  claiming the link was verified.
 - Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
 - Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
 - Keep private action and dependency access requirements documented in `README.md`.
@@ -155,7 +165,9 @@
   with exactly one space on either side of each pipe, as in `Prop | Behavior` and `--- | ---:`, with no leading or
   trailing pipe. Never pad cells or lengthen separator dashes to align columns. Preserve only required alignment
   markers such as `---:`, `:---`, and `:---:`. When editing a document for any reason, preserve compact tables and
-  restore compact formatting in every table touched by the change.
+  restore compact formatting in every table touched by the change. Prettier pads every pipe table it formats, so never
+  run Prettier, or any other formatter that rewrites tables, on a Markdown file. Keep Markdown out of a repository's
+  `format` scripts and list it in `.prettierignore` so a direct `prettier --write` on a document is a no-op.
 - Downstream README files should link to this repository's workflow descriptions instead of repeating shared behavior.
   For each local wrapper, document only the applicable local trigger and branch behavior, working directory, skipped
   commands, destination or S3 prefix, bundle files and naming, dependency refs, policy overrides, and required local
@@ -167,8 +179,10 @@
 - Do not disable a shared CI standard-script flag (`run-format`, `run-lint`, `run-check`, `run-build`) unless the caller
   defines no such npm script, and document that reason where the wrapper is described. A caller that defines the script
   runs it; skipping one silently removes coverage every other caller has.
-- Auto-create-dev-pr callers with a repository `RELEASE_TOKEN` secret should pass that secret explicitly to the shared
-  workflow. Use that token for trusted user or agent-authored dev pull requests.
+- Auto-create-dev-pr callers should pass `CHECKOUT_TOKEN` so the shared workflow can write the `DEV_PR_OPEN`
+  repository variable, and should pass a repository `RELEASE_TOKEN` secret, when present, for trusted user or
+  agent-authored dev pull requests. Callers must also trigger on production-branch pushes and keep the shared
+  `DEV_PR_OPEN` job-level skip so `dev` pushes do not start a runner while a dev pull request is open.
 - Workflows must fail clearly when a requested feature requires credentials, secrets, repository variables, external
   permissions, or paid services that are not configured. Apply this to dry-run modes too: a dry run may avoid external
   writes, but it should still prove that required credentials exist unless the feature is explicitly documented as
@@ -187,13 +201,44 @@
   and do not exaggerate routine maintenance as user-facing work.
 - Treat upstream automation, shared workflow reference, dependency-pin, Renovate, and release-policy maintenance as
   non-release work unless it changes repository user behavior or a published package/runtime API.
-- For rollup upload callers, ordinary `dev` pushes should run a separate shared CI wrapper instead of Rollup. Pushes
-  from `main` or `master` should run production uploads with unprefixed bundle names. Manual or trusted upstream-watch
-  dispatches from `dev` should run staged uploads with `dev_bundle.*` names.
+- For rollup upload callers, `dev` pushes should not run Rollup. Pushes from `main` or `master` should run production
+  uploads with unprefixed bundle names. Manual or trusted upstream-watch dispatches from `dev` should run staged uploads
+  with `dev_bundle.*` names.
 - When a Rollup caller needs a temporary deployment-readiness gate, pass the shared `deployment-enabled` input. Keep the
   caller job active so shared CI still runs, and apply the gate only to the shared upload job.
-- Do not trigger GitHub Actions workflows from pull-request events. Run pre-merge CI, build, Pages, and
-  workflow-validation checks from `dev` pushes, and retain production-branch push checks after merge.
+- Do not trigger GitHub Actions workflows from pull-request events. `auto-create-dev-pr` is the only workflow that runs
+  automatically on `dev` pushes; run pre-merge CI, build, Pages, and workflow-validation checks on `dev` through manual
+  dispatch, and retain production-branch push checks after merge.
+
+## Pull Request External Configuration Handoffs
+
+- When a pull request depends on configuration or approval that cannot be committed to the repository, put a prominent
+  caution in the pull-request description before its merge or deployment instructions. This includes repository,
+  organization, or environment variables and secrets; API credentials and tokens; cloud projects, billing, identities,
+  permissions, services, and resources; OAuth applications, origins, and callback URLs; DNS and provider-dashboard
+  settings; third-party approval; paid-plan requirements; production migrations; and other manual external state.
+- Make the caution an actionable inventory. Name every required item exactly, identify where it must be configured,
+  distinguish public configuration from secrets, state prerequisites and required ordering, explain how to verify the
+  resulting contract without revealing secret values, and state what remains unavailable or fails while an item is
+  missing. Never put a credential, token, private key, or other secret value in the pull request.
+- Separate completed external setup from pending work and include verification evidence for completed items. Keep an
+  activation-dependent pull request explicitly blocked while required external setup or verification remains pending,
+  and update the caution as each item is completed so later maintainers do not repeat a destructive step or assume that
+  committed workflow or migration files changed the external system.
+
+## Commit Integrity
+
+- Assume another session may be editing the same working tree at the same time. A commit must hold exactly the
+  changes its session made, and never another session's.
+- Stage by path, never with `git add -A`, `git add .`, or `git commit -a`. Before staging a file, read its
+  `git diff`: if any hunk is not yours, stage only your hunks, or leave the file and tell the user. After staging,
+  `git diff --cached --stat` must list only your files, since another session may have staged something too.
+- Never stash, reset, restore, or check out a file you did not change, because doing so moves another session's
+  uncommitted work.
+- Right after committing, compare `git show --stat HEAD` with the files you meant to commit, and confirm that `HEAD`'s
+  parent is the commit you started from. If your change is missing, landed in another session's commit, or shares
+  your commit with work you did not make, stop and tell the user before pushing. Never rewrite a pushed commit to
+  fix this.
 
 ## Release Management
 
@@ -230,7 +275,10 @@
   unambiguous identified set of pull requests. Requests to fix, finish, deploy, publish, investigate, make checks green,
   or continue do not authorize a merge; neither do green checks, review completion, mergeability, or prior authorization
   for a different pull request. When a pull request is ready without explicit merge authorization, leave it open and
-  report its readiness.
+  report its readiness. The instruction must say **merge** and name the pull request by number or URL. A reply such as
+  "go for it," "proceed," or "ship it" does not authorize a merge, even right after the assistant proposes merging a
+  specific pull request, and permission to commit or push is not permission to merge. Ask for that instruction when a
+  deployment needs a merge.
 - Keep `.github/workflows/workflow-validation.yml` aligned with workflow and composite-action changes so `actionlint` and
   `zizmor` run when automation files change.
 - Add workflow-validation callers to dependent repositories when they own meaningful local workflow logic, such as
