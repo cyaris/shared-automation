@@ -231,21 +231,23 @@
 - Assume another session may be editing the same working tree at the same time. A commit must hold exactly the
   changes its session made, and never another session's.
 - Stage by path, never with `git add -A`, `git add .`, or `git commit -a`. Before staging a file, read its
-  `git diff`: if any hunk is not yours, stage only your hunks, or leave the file and tell the user. After staging,
-  `git diff --cached --stat` must list only your files, since another session may have staged something too.
+  `git diff`: if any hunk is not yours, stage only your hunks, or leave the file and tell the user. Before
+  committing, run `git diff --cached --stat` on its own and read it: another session may have staged files you never
+  touched, and a plain `git commit` takes all of them. If it lists anything that is not yours, commit through the
+  temporary index described below instead. Never chain staging, this check, and the commit in one command.
 - Never stash, reset, restore, or check out a file you did not change, because doing so moves another session's
   uncommitted work.
 - Make, commit, and push a change from the working tree the user runs, never from a separate worktree or clone of
   it. A commit pushed from elsewhere leaves the user's checkout behind its own branch, so a running dev server never
   shows the change, and where another session has uncommitted edits to the same files, the next pull cannot apply
   without stashing or merging that work. A scratch worktree may build or test a candidate tree but never commits to
-  a branch the user's checkout tracks. When another session has staged hunks in a file you also changed, commit
-  through a temporary index built from `HEAD` plus only your hunks, then add the same hunks to the shared index, so
-  neither the working tree nor the other session's staging moves.
+  a branch the user's checkout tracks. When the shared index holds anything another session staged, commit through
+  a temporary index built from `HEAD` plus only your hunks, then add the same hunks to the shared index, so neither
+  the working tree nor the other session's staging moves.
 - Right after committing, compare `git show --stat HEAD` with the files you meant to commit, and confirm that `HEAD`'s
-  parent is the commit you started from. If your change is missing, landed in another session's commit, or shares
-  your commit with work you did not make, stop and tell the user before pushing. Never rewrite a pushed commit to
-  fix this.
+  parent is the commit you started from, as a separate step before any push, never chained to the commit. If your
+  change is missing, landed in another session's commit, or shares your commit with work you did not make, stop and
+  tell the user before pushing. Never rewrite a pushed commit to fix this.
 
 ## Release Management
 
