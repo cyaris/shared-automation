@@ -12,6 +12,13 @@ on:
         description: AWS region containing the stack.
         required: true
         type: string
+      deploy-on-changes-to:
+        description: >-
+          Optional path. When set, deploy only if it differs from the commit of the calling workflow's newest successful
+          run on this branch and event. Empty always deploys.
+        required: false
+        type: string
+        default: ""
       aws-role-to-assume:
         description: Optional AWS role ARN for OIDC authentication. If omitted, AWS access key secrets are used.
         required: false
@@ -52,11 +59,65 @@ on:
         description: Optional AWS session token used when aws-role-to-assume is omitted.
         required: false
 
+    outputs:
+      deployed:
+        description: Whether this run deployed the stack.
+        value: ${{ jobs.detect-changes.outputs.deploy }}
+
 permissions:
   contents: read
 
 jobs:
+  detect-changes:
+    # Reading the calling workflow's runs needs `actions: read`, which every caller grants for that reason.
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.changes.outputs.deploy }}
+
+    steps:
+      - name: Checkout caller repository
+        if: inputs.deploy-on-changes-to != ''
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: changes
+        name: Detect infrastructure changes
+        env:
+          CHANGED_PATH: ${{ inputs.deploy-on-changes-to }}
+          GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          set -euo pipefail
+
+          # Compare with the newest successful run of the calling workflow rather than the triggering push's own
+          # range. A newer push replaces a still-pending run in a concurrency group, and a failed run leaves its stack
+          # undeployed, so either would hide a change from every later run. A caller's run succeeds only when this
+          # deployment succeeded or found nothing to deploy, so its commit marks deployed infrastructure. Runs of
+          # other events are not counted, since a caller may skip deployment for them.
+          deploy="true"
+          if [[ -n "$CHANGED_PATH" ]]; then
+            workflow_file="${WORKFLOW_REF%@*}"
+            workflow_file="${workflow_file##*/}"
+            deployed_sha="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow_file" --branch "$REF_NAME" \
+              --event "$GITHUB_EVENT_NAME" --status success --limit 1 --json headSha --jq '.[0].headSha // empty')"
+            if [[ -n "$deployed_sha" ]] && git cat-file -e "$deployed_sha^{commit}" 2>/dev/null \
+              && git diff --quiet "$deployed_sha" "$GITHUB_SHA" -- "$CHANGED_PATH"; then
+              deploy="false"
+              printf "%s is unchanged since %s, the newest successful %s run.\n" "$CHANGED_PATH" "$deployed_sha" "$workflow_file"
+            fi
+          fi
+
+          printf "deploy=%s\n" "$deploy" >> "$GITHUB_OUTPUT"
+
   deploy:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.deploy == 'true'
     # The OIDC path needs an ID token, and a called workflow can only keep permissions its caller grants, so every
     # caller grants this job `id-token: write` even when it deploys with access keys.
     permissions:
