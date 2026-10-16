@@ -62,7 +62,8 @@ on:
     outputs:
       deployed:
         description: Whether this run deployed the stack.
-        value: ${{ jobs.detect-changes.outputs.deploy }}
+        # Set only by the deploy job's last step, so a skipped or failed deployment reads false.
+        value: ${{ jobs.deploy.outputs.deployed == 'true' }}
 
 permissions:
   contents: read
@@ -78,6 +79,19 @@ jobs:
       deploy: ${{ steps.changes.outputs.deploy }}
 
     steps:
+      # Runs before change detection, so an unchanged path cannot skip it.
+      - name: Validate dispatch actor
+        env:
+          ALLOWED_DISPATCH_ACTOR: ${{ inputs.allowed-dispatch-actor }}
+        run: |
+          set -euo pipefail
+
+          # A re-run keeps the original actor while the person who started it is the triggering actor.
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && ( "$GITHUB_ACTOR" != "$ALLOWED_DISPATCH_ACTOR" || "$GITHUB_TRIGGERING_ACTOR" != "$ALLOWED_DISPATCH_ACTOR" ) ]]; then
+            printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
+            exit 1
+          fi
+
       - name: Checkout caller repository
         if: inputs.deploy-on-changes-to != ''
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -124,23 +138,18 @@ jobs:
       contents: read
       id-token: write
     runs-on: ubuntu-latest
+    outputs:
+      deployed: ${{ steps.deployed.outputs.deployed }}
 
     steps:
       - name: Validate deployment request
         env:
-          ALLOWED_DISPATCH_ACTOR: ${{ inputs.allowed-dispatch-actor }}
           AWS_ACCESS_KEY_ID_INPUT: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_ROLE_TO_ASSUME: ${{ inputs.aws-role-to-assume }}
           AWS_SECRET_ACCESS_KEY_INPUT: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           STACK_NAME: ${{ inputs.stack-name }}
         run: |
           set -euo pipefail
-
-          # A re-run keeps the original actor while the person who started it is the triggering actor.
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && ( "$GITHUB_ACTOR" != "$ALLOWED_DISPATCH_ACTOR" || "$GITHUB_TRIGGERING_ACTOR" != "$ALLOWED_DISPATCH_ACTOR" ) ]]; then
-            printf "Manual dispatch is restricted to %s.\n" "$ALLOWED_DISPATCH_ACTOR" >&2
-            exit 1
-          fi
 
           if [[ ! "$STACK_NAME" =~ ^[A-Za-z][A-Za-z0-9-]*$ ]]; then
             printf "Invalid CloudFormation stack name: %s\n" "$STACK_NAME" >&2
@@ -200,3 +209,7 @@ jobs:
           STACK_NAME: ${{ inputs.stack-name }}
         working-directory: ${{ inputs.working-directory }}
         run: npx cdk deploy "$STACK_NAME" --require-approval never
+
+      - id: deployed
+        name: Record deployment
+        run: printf "deployed=true\n" >> "$GITHUB_OUTPUT"
