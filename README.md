@@ -89,8 +89,15 @@ commit-prefix parsing.
 
 Reusable AWS CDK deployment workflow for Node-based infrastructure packages. It installs the caller's locked
 dependencies, optionally synthesizes and tests the stack, authenticates to AWS, and runs `cdk deploy` with interactive
-approval disabled. Caller wrappers own their triggers and should invoke deployment only from a production branch when
-the infrastructure directory changes. A caller that also publishes application artifacts should make that publication
+approval disabled. Caller wrappers own their triggers and should invoke deployment only from a production branch.
+
+With `deploy-on-changes-to` set to the infrastructure directory, the workflow deploys only when that path differs from
+the commit of the calling workflow's newest successful run on the same branch and event, or when no such run exists.
+It does not compare the triggering push's own range: a newer push replaces a still-pending run in a concurrency group,
+and a failed run leaves its stack undeployed, so either would hide a change from every later run. This relies on the
+caller's run failing whenever deployment fails, which a publication job that depends on this one ensures. Runs of
+other events are not counted, since a caller may skip deployment for them. The `deployed` output reports whether the
+stack deployed. A caller that also publishes application artifacts should make that publication
 depend on this workflow job so code cannot reach production before infrastructure it requires.
 
 The workflow accepts these inputs:
@@ -98,13 +105,15 @@ The workflow accepts these inputs:
 - `allowed-dispatch-actor`, defaulting to `cyaris`
 - required `aws-region`
 - optional `aws-role-to-assume` for OIDC authentication
+- optional `deploy-on-changes-to`, which deploys only when that path changed as described above; empty always deploys
 - `node-version`, defaulting to `24`
 - `run-synth` and `run-test`, both defaulting to `true`
 - required `stack-name`
 - `working-directory`, defaulting to `infra`
 
-AWS OIDC is preferred. Every caller grants its reusable-workflow job `contents: read` and `id-token: write`, because
-the shared deploy job requests the ID token and a called workflow cannot request a permission its caller withholds. A
+AWS OIDC is preferred. Every caller grants its reusable-workflow job `contents: read`, `actions: read`, and
+`id-token: write`, because the shared jobs read the calling workflow's runs and request the ID token, and a called
+workflow cannot request a permission its caller withholds. A
 caller that passes `aws-role-to-assume` stores the deployment role ARN in a repository variable. When the role input is
 empty, callers must forward `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. Missing
 credentials fail before checkout or deployment.
