@@ -231,9 +231,11 @@
 - Assume another session may be editing the same working tree at the same time. A commit must hold exactly the
   changes its session made, and never another session's.
 - Stage by path, never with `git add -A`, `git add .`, or `git commit -a`. Before staging a file, read its
-  `git diff`: if any hunk is not yours, stage only your hunks, or leave the file and tell the user. Before
-  committing, run `git diff --cached --stat` on its own and read it: another session may have staged files you never
-  touched, and a plain `git commit` takes all of them. If it lists anything that is not yours, commit through the
+  `git diff HEAD -- <path>`, which shows staged hunks as well as unstaged ones: if any hunk is not yours, stage only
+  your hunks, or leave the file and tell the user. Before committing, read the full `git diff --cached` on its own,
+  hunk by hunk: another session may have staged files you never touched, or hunks in a file you also changed, and a
+  plain `git commit` takes all of them. `git diff --cached --stat` summarizes it but lists only files, so it cannot
+  show a foreign hunk in your own file. If the staged diff holds anything that is not yours, commit through the
   temporary index described below instead. Never chain staging, this check, and the commit in one command.
 - Never stash, reset, restore, or check out a file you did not change, because doing so moves another session's
   uncommitted work.
@@ -244,10 +246,10 @@
   a branch the user's checkout tracks. When the shared index holds anything another session staged, commit through
   a temporary index built from `HEAD` plus only your hunks, then add the same hunks to the shared index, so neither
   the working tree nor the other session's staging moves.
-- Right after committing, compare `git show --stat HEAD` with the files you meant to commit, and confirm that `HEAD`'s
-  parent is the commit you started from, as a separate step before any push, never chained to the commit. If your
-  change is missing, landed in another session's commit, or shares your commit with work you did not make, stop and
-  tell the user before pushing. Never rewrite a pushed commit to fix this.
+- Right after committing, compare the full `git show HEAD` with the hunks you meant to commit, and confirm that
+  `HEAD`'s parent is the commit you started from, as a separate step before any push, never chained to the commit. If
+  your change is missing, landed in another session's commit, or shares your commit with work you did not make, stop
+  and tell the user before pushing. Never rewrite a pushed commit to fix this.
 
 ## Release Management
 
