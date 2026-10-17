@@ -50,8 +50,7 @@
 - When an example supports an existing README bullet, make the example a subbullet under that point even when there is
   only one example. Use `Example:` for one example and `Examples:` for multiple examples.
 - Let table-of-contents nesting reflect the document structure even when a section has only two children.
-- Keep documentation style guidance in AGENTS.md instead of the README.
-- Keep future maintainer instructions in AGENTS.md instead of the README. The README should describe project behavior,
+- Keep documentation style guidance and future maintainer instructions in AGENTS.md instead of the README. The README should describe project behavior,
   commands, outputs, and user-facing effects rather than telling future editors what they should do. This covers durable
   standing conventions only, such as a step that must be repeated whenever a given file changes. Do not move an open work
   item into AGENTS.md: a `TODO`, a known gap, a planned migration, or an undecided design choice is tracked where the

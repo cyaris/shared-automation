@@ -64,8 +64,8 @@
 ## Release Management
 
 - Use the default policy in `.github/release-policy.yml` unless a caller has a durable project-specific override in its
-  own `.github/release-policy.yml`. Keep version and title formats in policy files rather than duplicating them in
-  `AGENTS.md`.
+  own `.github/release-policy.yml`, which never reintroduces shared release implementation logic. Keep version and
+  title formats in policy files rather than duplicating them in `AGENTS.md`.
 - Evaluate whether accumulated changes form a meaningful release milestone. Substantial user-facing features,
   architecture changes, important reliability, security, accessibility, performance, or compatibility improvements,
   and coherent groups of material changes may warrant a release. Routine maintenance, formatting, minor refactors,

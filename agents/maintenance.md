@@ -13,9 +13,10 @@
 
 ## Workflow Documentation
 
-- Document every workflow and composite action in `README.md` when adding, renaming, or changing it in a way that affects callers.
-- Document each reusable workflow's trigger model, purpose, caller-facing inputs, required secrets, optional secrets, dispatch behavior, and caller expectations.
-- Document whether a workflow can be dispatched from the GitHub Actions UI and how it is dispatched when UI dispatch is not available.
+- Document every workflow and composite action in `README.md` when adding, renaming, or changing it in a way that
+  affects callers: its trigger model, purpose, caller-facing inputs, required and optional secrets, caller
+  expectations, and dispatch behavior, including whether it can be dispatched from the GitHub Actions UI and how it is
+  dispatched when it cannot.
 
 ## Renovate Preset
 

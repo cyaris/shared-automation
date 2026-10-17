@@ -22,11 +22,8 @@
   tell the user before publication that the downstream workflow, build, or runtime will fail until upstream lands. Keep
   the downstream reference on the production branch and publish it when requested; do not conceal the dependency by
   pinning the unpublished commit or changing the caller to an upstream feature branch.
-- Keep the default release policy in this repository. Caller repositories should add `.github/release-policy.yml` only for project-specific overrides, not to reintroduce shared release implementation logic.
 - Keep release boundary decisions in the shared auto-release workflow and release-policy files. Caller repositories should
   not add separate release automation unless the user explicitly asks for a repository-specific exception.
-- Keep root `Rollup`, `Auto-create dev pull request`, and `Auto release` workflows as thin callers whenever the shared
-  workflows cover the needed behavior.
 - Do not move a repository-specific workflow implementation into this repository unless another repository will share the same behavior.
 - Manual `workflow_dispatch` paths must remain restricted to the `cyaris` GitHub actor by default. Trusted Rollup
   dispatches from the repository's upstream-watch workflow may also allow `github-actions[bot]`, gated on Rollup
@@ -85,8 +82,7 @@
 - Treat `actionlint` failures as workflow contract or syntax issues to fix before rollout.
 - Treat `zizmor` findings as security-review prompts. Fix true positives, document accepted risks, and avoid broad
   suppressions.
-- Keep third-party GitHub Actions hash-pinned when `zizmor` requires it. First-party reusable workflow callers may use
-  `cyaris/shared-automation` refs on `main` so callers pick up the latest shared workflow implementation.
+- Keep third-party GitHub Actions hash-pinned when `zizmor` requires it.
 - Extract non-trivial inline Node.js logic out of `run:` heredocs into standalone files under `.github/scripts/`,
   covered by `node --test`, rather than leaving security-relevant or otherwise complex logic untested inside a workflow
   step. Wire the reusable CI workflow's `run-test` input to run those tests before rollout.

@@ -6,6 +6,7 @@ all except `python-sql.md`, which applies here only when a change touches those 
 
 Topic | Covers | Applies to
 --- | --- | ---
+[`agents/code-style.md`](agents/code-style.md) | Language-neutral code style, imports, dependencies, and null handling | Every caller
 [`agents/documentation.md`](agents/documentation.md) | README and Markdown style, link verification, and compact tables | Every caller
 [`agents/git-and-pull-requests.md`](agents/git-and-pull-requests.md) | Agent and skill execution, commit integrity, merges, external-configuration handoffs, and releases | Every caller
 [`agents/maintenance.md`](agents/maintenance.md) | Reusable workflow implementation, documentation, and the Renovate preset | This repository only
@@ -14,8 +15,8 @@ Topic | Covers | Applies to
 
 ## Scope And Inheritance
 
-- A repository that calls workflows or actions from `cyaris/shared-automation` imports `documentation.md`,
-  `git-and-pull-requests.md`, and `workflows.md` from its `CLAUDE.md`, and `python-sql.md` only where it opts into the
+- A repository that calls workflows or actions from `cyaris/shared-automation` imports `code-style.md`,
+  `documentation.md`, `git-and-pull-requests.md`, and `workflows.md` from its `CLAUDE.md`, and `python-sql.md` only where it opts into the
   shared language conventions, from the `CLAUDE.md` nearest its Python or SQL. It names the same files in its
   `AGENTS.md` for agents that do not follow imports, then lists only caller-specific details that differ from the
   shared defaults.

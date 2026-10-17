@@ -1,27 +1,18 @@
 # Python And SQL
 
-- Apply these conventions to tracked and nonignored Python and SQL source files. Skip generated, vendored, build-output, and ignored files unless a task explicitly requires them.
-- Follow the repository's configured formatter, import sorter, and linter rather than hand-formatting against their output. After changing Python or SQL in a repository that defines formatting or lint validation commands, run every applicable validation and address its findings.
-- Write comments only when they materially clarify necessary context. Fix typos in comments that you write or edit nearby.
-- Do not define a local variable if it is referenced only once unless its name materially improves clarity or the variable is needed for correctness; otherwise, inline its value. Line wrapping alone does not justify a single-use variable.
-- Group consecutive statements by purpose with one blank line between groups. Keep statements together when they are the same kind or directly sequentially related; a standalone comment counts as the separator, so do not also add a blank line immediately before it solely to create separation.
-- When order has no semantic, dependency, source-order, or configuration-defined meaning, arrange lists, dictionary keys, named definitions, and other code collections alphabetically. Compare code case-sensitively with uppercase before lowercase, and let the formatter, import sorter, linter, or another installed ordering tool take precedence.
-- Format user-facing or human-readable logged numeric quantities with thousands separators. In Python, include `,` in the format specifier, such as `f"{count:,d}"` or `f"{count:,}"`. Do not apply numeric formatting to identifiers, to other values whose digits are not quantities, or to structured log fields a parser or metrics pipeline consumes, because the separators make them locale-dependent strings.
-- Declare every installed dependency in the owning project's dependency file rather than relying on the local environment or a transitive dependency.
-- Keep `null` distinct from zero in transformations and outputs. Coalesce a missing value to `0` only when coverage or
-  derivation proves it is zero, so a consumer can show it as unknown.
+These rules add to `code-style.md` for tracked, nonignored Python and SQL source files.
 
-### Python
+## Python
 
 - Format Python with the repository's Black and isort settings.
-- Keep imports at the top of a module. Defer an import into a function only to break a circular dependency or when the module must run without a genuinely optional dependency. Let isort determine import ordering; its output takes precedence over manual ordering.
+- Let isort determine import ordering. Its output takes precedence over manual ordering.
 - Leave a blank line immediately before every `return` unless the return is the first statement in the function body, the immediate body of an `if`/`elif`/`else` guard, or immediately follows a multiline string assignment.
 - Omit a bare `return` only when control would naturally reach the end of the function at that point. Keep or add a bare `return` for an intentional early exit that prevents later statements from running, and do not write `return None` for a no-value return.
 - Follow an `if`/`elif`/`else` statement with a blank line before the next statement unless it is the last statement in its block. A standalone comment immediately after the conditional counts as that separation, so do not also add a blank line before the comment.
 - Before formatting, remove trailing commas that serve no syntactic purpose. Keep a comma when syntax requires it or when Black restores it to preserve the formatted layout; judge nested collections independently because Black may collapse them separately.
 - Indent the contents of a multiline triple-quoted string to the indentation of its opening delimiter. When the opening delimiter shares a line with a statement, use that statement's indentation; when the delimiter stands on its own as a nested argument, align the contents with the delimiter rather than dedenting them.
 
-### SQL
+## SQL
 
 - Write SQL operations and keywords in lowercase.
 - Put each clause, such as `select`, `from`, `where`, `group by`, `order by`, and `limit`, on its own line. A query may remain on one line only when it is a single-item `select` from one table with no other clauses.
