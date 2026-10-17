@@ -76,3 +76,11 @@
   For each local wrapper, document only the applicable local trigger and branch behavior, working directory, skipped
   commands, destination or S3 prefix, bundle files and naming, dependency refs, policy overrides, and required local
   variables or secrets. Then link to the shared workflow description for common behavior, inputs, and secrets.
+- When a change affects product behavior, routes, architecture, APIs or data sources, data models, live or background
+  behavior, or a meaningful edge case, update the Markdown document that owns that subject in the same change. Prefer an
+  existing owner over a new document, and make no documentation-only change for a trivial implementation detail.
+- Label documented functionality as implemented, partially implemented, or planned when its status could be
+  ambiguous, and update the label when implementation changes, so planned behavior never reads as current.
+- When a change makes a meaningful architectural decision, record the problem, the approved approach and its
+  rationale, the alternatives considered, tradeoffs, and important edge cases in the document that owns that area. For
+  a later replacement, document what changed and why rather than rewriting the earlier record.

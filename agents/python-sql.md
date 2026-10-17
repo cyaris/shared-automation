@@ -8,6 +8,8 @@
 - When order has no semantic, dependency, source-order, or configuration-defined meaning, arrange lists, dictionary keys, named definitions, and other code collections alphabetically. Compare code case-sensitively with uppercase before lowercase, and let the formatter, import sorter, linter, or another installed ordering tool take precedence.
 - Format user-facing or human-readable logged numeric quantities with thousands separators. In Python, include `,` in the format specifier, such as `f"{count:,d}"` or `f"{count:,}"`. Do not apply numeric formatting to identifiers, to other values whose digits are not quantities, or to structured log fields a parser or metrics pipeline consumes, because the separators make them locale-dependent strings.
 - Declare every installed dependency in the owning project's dependency file rather than relying on the local environment or a transitive dependency.
+- Keep `null` distinct from zero in transformations and outputs. Coalesce a missing value to `0` only when coverage or
+  derivation proves it is zero, so a consumer can show it as unknown.
 
 ### Python
 

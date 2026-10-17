@@ -30,6 +30,10 @@
   and tell the user before pushing. Never rewrite a pushed commit to fix this.
 - Write clear, specific commit subjects that describe the actual change. Prefer plain language over release-tool syntax,
   and do not exaggerate routine maintenance as user-facing work.
+- Never commit, print, or log a secret, or put one in a fixture, URL, client response, analytics event, or pull
+  request. Treat public keys, such as a CAPTCHA site key, as configuration, and keep secrets server-side and out of
+  browser-readable roles. A provider's official test credentials may appear in local-development fixtures, never in
+  production configuration.
 
 ## Pull Requests
 
