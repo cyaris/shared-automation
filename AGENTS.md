@@ -8,7 +8,7 @@ Topic | Covers | Applies to
 --- | --- | ---
 [`agents/code-style.md`](agents/code-style.md) | Language-neutral code style, imports, dependencies, and null handling | Every caller
 [`agents/documentation.md`](agents/documentation.md) | README and Markdown style, link verification, and compact tables | Every caller
-[`agents/git-and-pull-requests.md`](agents/git-and-pull-requests.md) | Agent and skill execution, commit integrity, merges, external-configuration handoffs, and releases | Every caller
+[`agents/git-and-pull-requests.md`](agents/git-and-pull-requests.md) | Agent and skill execution, commit integrity, secrets, merges, external-configuration handoffs, and releases | Every caller
 [`agents/maintenance.md`](agents/maintenance.md) | Reusable workflow implementation, documentation, and the Renovate preset | This repository only
 [`agents/python-sql.md`](agents/python-sql.md) | Python and SQL formatting and style | Callers that opt in
 [`agents/workflows.md`](agents/workflows.md) | Caller workflows, refs, dispatch, failures, Rollup, Renovate wrappers, and workflow validation | Every caller
