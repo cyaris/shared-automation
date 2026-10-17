@@ -16,6 +16,10 @@ repository.
   - `~/Documents/github/.agents-root` exists, and `~/.codex/config.toml` sets `project_root_markers =
     [".agents-root"]` and a `project_doc_max_bytes` above the longest instruction chain, so Codex reads
     `~/Documents/github/AGENTS.md` before each repository's own files
+- Recreate or repair that wiring on any machine by running `node .github/scripts/setup-workspace.js` from this
+  repository, and confirm it with `--check`. Every rule lives in this repository, so the wiring holds nothing that a
+  fresh checkout and one run cannot restore. Keep the script's tests passing, and update the script with any change
+  to the wiring.
 - A checkout outside `~/Documents/github`, such as a cloud session or CI runner, has no workspace file, so neither
   agent sees these rules there.
 
