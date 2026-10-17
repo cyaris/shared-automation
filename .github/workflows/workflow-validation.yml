@@ -22,7 +22,6 @@ on:
       - ".github/release-policy.yml"
       - ".github/workflows/**"
       - "AGENTS.md"
-      - "agents/**"
       - "README.md"
       - "renovate.json"
   workflow_dispatch:
