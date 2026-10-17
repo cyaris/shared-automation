@@ -61,6 +61,11 @@ ignored files, such as `.svelte-kit/` or `dist/`, unless a task explicitly requi
 - Treat a valid `0` as data and keep `null` distinct from zero. Use finite-value checks rather than truthiness for
   numeric values, and coalesce a missing value to `0` only when coverage or derivation proves it is zero, so a display
   can show it as unknown.
+- Store a persisted preference with the surface that owns its control. When a control moves to another surface, move
+  its stored value in the same change: migrate server rows and device storage to the new location rather than leaving
+  the value where it was. Read the old location only as a bridge while existing data still holds it, order a server
+  migration after the code that reads the new location is deployed when earlier code cannot read it, and track the
+  bridge's removal once nothing holds the old location.
 
 ## Documentation
 
