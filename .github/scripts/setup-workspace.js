@@ -77,8 +77,11 @@ function setupWorkspace({ codexConfig, workspaceRoot }) {
   if (fs.existsSync(claude) && !["", CLAUDE_TEXT].includes(fs.readFileSync(claude, "utf8"))) {
     throw new Error(`${claude} has other content. Move it, then rerun.`)
   }
-  if (agentsStat) fs.unlinkSync(agents)
-  fs.symlinkSync(target, agents)
+  // A link that already points at the workspace file stays, so a rerun never leaves a moment without one.
+  if (!agentsStat || fs.readlinkSync(agents) != target) {
+    if (agentsStat) fs.unlinkSync(agents)
+    fs.symlinkSync(target, agents)
+  }
   fs.writeFileSync(claude, CLAUDE_TEXT)
   fs.writeFileSync(path.join(workspaceRoot, ROOT_MARKER), "")
   fs.mkdirSync(path.dirname(codexConfig), { recursive: true })

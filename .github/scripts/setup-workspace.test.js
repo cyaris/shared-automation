@@ -36,7 +36,7 @@ test("writeCodexSettings keeps a project_doc_max_bytes larger than the minimum",
   )
 })
 
-test("setupWorkspace wires an empty workspace and inspectWorkspace then finds nothing missing", () => {
+test("setupWorkspace wires an empty workspace and inspectWorkspace then finds nothing missing", t => {
   const options = createWorkspace()
 
   // The workspace file exists, so the symlink, CLAUDE.md, marker, and both Codex settings are missing.
@@ -44,8 +44,11 @@ test("setupWorkspace wires an empty workspace and inspectWorkspace then finds no
   setupWorkspace(options)
   assert.deepEqual(inspectWorkspace(options), [])
   assert.equal(fs.readFileSync(path.join(options.workspaceRoot, "AGENTS.md"), "utf8"), "# Workspace\n")
+  // A rerun keeps the existing link rather than replacing it.
+  const unlink = t.mock.method(fs, "unlinkSync")
   setupWorkspace(options)
   assert.deepEqual(inspectWorkspace(options), [])
+  assert.equal(unlink.mock.callCount(), 0)
 })
 
 test("setupWorkspace refuses to replace a regular AGENTS.md or a CLAUDE.md with other content", () => {
