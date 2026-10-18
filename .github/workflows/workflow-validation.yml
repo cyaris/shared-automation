@@ -22,9 +22,9 @@ on:
       - ".github/release-policy.yml"
       - ".github/workflows/**"
       - "AGENTS.md"
+      - "README.md"
       - "WORKSPACE_AGENTS.md"
       - "agents/**"
-      - "README.md"
       - "renovate.json"
   workflow_dispatch:
 
