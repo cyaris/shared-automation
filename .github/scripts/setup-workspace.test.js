@@ -29,6 +29,13 @@ test("writeCodexSettings sets the two top-level keys and keeps every other setti
   assert.equal(writeCodexSettings(written), written)
 })
 
+test("writeCodexSettings keeps a project_doc_max_bytes larger than the minimum", () => {
+  assert.equal(
+    writeCodexSettings("project_doc_max_bytes = 524288\n"),
+    'project_doc_max_bytes = 524288\nproject_root_markers = [".agents-root"]\n'
+  )
+})
+
 test("setupWorkspace wires an empty workspace and inspectWorkspace then finds nothing missing", () => {
   const options = createWorkspace()
 

@@ -28,11 +28,13 @@ function readCodexSettings(text) {
   }
 }
 
-// Sets the two top-level Codex keys without touching any other setting, inserting them before the first table.
+// Sets the two top-level Codex keys without touching any other setting, inserting them before the first table. A
+// larger existing project_doc_max_bytes is kept.
 function writeCodexSettings(text) {
   let top = text.slice(0, topLevelEnd(text))
   const rest = text.slice(topLevelEnd(text))
-  const lines = [`project_doc_max_bytes = ${MAX_BYTES}`, `project_root_markers = ["${ROOT_MARKER}"]`]
+  const maxBytes = Math.max(readCodexSettings(text).maxBytes, MAX_BYTES)
+  const lines = [`project_doc_max_bytes = ${maxBytes}`, `project_root_markers = ["${ROOT_MARKER}"]`]
 
   top = top.replace(/^project_doc_max_bytes\s*=.*\n?/m, "").replace(/^project_root_markers\s*=.*\n?/m, "")
   top = top.replace(/\n*$/, top.trim() ? "\n" : "")
