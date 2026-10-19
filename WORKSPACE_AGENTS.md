@@ -407,6 +407,9 @@ Applies to Svelte code.
   Use a component `<style>` block only when Tailwind cannot express the selector, state, or value clearly, do not create
   custom classes solely as styling hooks for static CSS, and reserve Tailwind `!` modifiers for real external or
   host-page CSS override needs.
+- Never spread a subgrid row's columns with `justify-between` or another parent `justify-content` value. Safari lays
+  out a subgrid row without the parent grid's `justify-content` spacing, so the row stops short of its container's
+  edge. Size the tracks to place the columns instead.
 - Render a genuinely repeated or dynamic list of near-identical elements from a data array through one `{#each}` block,
   per the Shared Code section, but keep a small fixed set explicit when a loop would need per-item conditionals or styling that
   make it harder to read.
