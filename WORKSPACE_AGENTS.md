@@ -200,6 +200,10 @@ ignored files, such as `.svelte-kit/` or `dist/`, unless a task explicitly requi
   "go for it," "proceed," or "ship it" does not authorize a merge, even right after the assistant proposes merging a
   specific pull request, and permission to commit or push is not permission to merge. Ask for that instruction when a
   deployment needs a merge.
+- Treat a conflict between a pull request's head and base branches as pre-merge work. As soon as the user authorizes
+  the merge or the pre-merge steps, merge the base into the head branch in the user's working tree, resolve each
+  conflict as the pull request's description or the branch history directs, and push it without asking again. Ask only
+  when neither settles a conflict. Resolving the conflict never authorizes the merge itself.
 - Before merging any pull request, explicitly inspect CodeRabbit comments and reviews and assess every still-applicable
   finding; do not merge solely because checks are green.
 - When a pull request depends on configuration or approval that cannot be committed to the repository, put a prominent
