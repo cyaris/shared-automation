@@ -203,7 +203,9 @@ ignored files, such as `.svelte-kit/` or `dist/`, unless a task explicitly requi
 - Treat a conflict between a pull request's head and base branches as pre-merge work. As soon as the user authorizes
   the merge or the pre-merge steps, merge the base into the head branch in the user's working tree, resolve each
   conflict as the pull request's description or the branch history directs, and push it without asking again. Ask only
-  when neither settles a conflict. Resolving the conflict never authorizes the merge itself.
+  when neither settles a conflict. Resolving the conflict never authorizes the merge itself. The resolution is a new
+  head commit, so it needs the review and validation any other commit does before the merge pins its SHA, unless its
+  tree matches the head already reviewed.
 - Merge an authorized pull request with a merge commit, never a squash or rebase, so `main` keeps the reviewed `dev`
   commits that later merges, cherry-picks, and IP records name. Pin the merge to the reviewed head with
   `gh pr merge <number> --merge --match-head-commit <full head SHA>`.
