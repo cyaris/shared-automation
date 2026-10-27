@@ -331,6 +331,8 @@ Important inputs:
 - `shared-automation-repository` and `shared-automation-ref`, defaulting to `cyaris/shared-automation` on `main`, naming
   the source of the Vite public environment parser
 - `allowed-dispatch-actor`, defaulting to `cyaris`
+- `timeout-minutes`, defaulting to `30`, after which GitHub cancels the job rather than letting a hung step hold the
+  runner for its six-hour limit
 
 When a caller supplies `local-dependency-repositories`, the workflow installs and builds those repositories before it
 runs `npm ci`. This sequence keeps local `file:` dependencies usable even when Git ignores generated `dist/` output.

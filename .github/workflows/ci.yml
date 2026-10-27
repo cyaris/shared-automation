@@ -63,6 +63,11 @@ on:
         required: false
         type: string
         default: cyaris
+      timeout-minutes:
+        description: Minutes the validation job may run before GitHub cancels it.
+        required: false
+        type: number
+        default: 30
     secrets:
       CHECKOUT_TOKEN:
         description: Optional token with access to private local dependency repositories.
@@ -77,6 +82,7 @@ permissions:
 jobs:
   node-package-ci:
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs['timeout-minutes'] }}
 
     steps:
       - name: Validate manual dispatcher

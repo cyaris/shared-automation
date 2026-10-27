@@ -200,6 +200,15 @@ ignored files, such as `.svelte-kit/` or `dist/`, unless a task explicitly requi
   "go for it," "proceed," or "ship it" does not authorize a merge, even right after the assistant proposes merging a
   specific pull request, and permission to commit or push is not permission to merge. Ask for that instruction when a
   deployment needs a merge.
+- Treat a conflict between a pull request's head and base branches as pre-merge work. As soon as the user authorizes
+  the merge or the pre-merge steps, merge the base into the head branch in the user's working tree, resolve each
+  conflict as the pull request's description or the branch history directs, and push it without asking again. Ask only
+  when neither settles a conflict. Resolving the conflict never authorizes the merge itself. The resolution is a new
+  head commit, so it needs the review and validation any other commit does before the merge pins its SHA, unless its
+  tree matches the head already reviewed.
+- Merge an authorized pull request with a merge commit, never a squash or rebase, so `main` keeps the reviewed `dev`
+  commits that later merges, cherry-picks, and IP records name. Pin the merge to the reviewed head with
+  `gh pr merge <number> --merge --match-head-commit <full head SHA>`.
 - Before merging any pull request, explicitly inspect CodeRabbit comments and reviews and assess every still-applicable
   finding; do not merge solely because checks are green.
 - When a pull request depends on configuration or approval that cannot be committed to the repository, put a prominent
@@ -407,6 +416,9 @@ Applies to Svelte code.
   Use a component `<style>` block only when Tailwind cannot express the selector, state, or value clearly, do not create
   custom classes solely as styling hooks for static CSS, and reserve Tailwind `!` modifiers for real external or
   host-page CSS override needs.
+- Never spread a subgrid row's columns with `justify-between` or another parent `justify-content` value. Safari lays
+  out a subgrid row without the parent grid's `justify-content` spacing, so the row stops short of its container's
+  edge. Size the tracks to place the columns instead.
 - Render a genuinely repeated or dynamic list of near-identical elements from a data array through one `{#each}` block,
   per the Shared Code section, but keep a small fixed set explicit when a loop would need per-item conditionals or styling that
   make it harder to read.
