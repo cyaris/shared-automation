@@ -58,6 +58,11 @@ on:
         required: false
         type: boolean
         default: false
+      run-browser-test:
+        description: Install Playwright's Chromium and run npm run test:browser.
+        required: false
+        type: boolean
+        default: false
       allowed-dispatch-actor:
         description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
         required: false
@@ -252,3 +257,13 @@ jobs:
           fi
 
           npm run build
+
+      - name: Install Playwright Chromium
+        if: inputs.run-browser-test
+        working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser tests
+        if: inputs.run-browser-test
+        working-directory: ${{ github.event.repository.name }}/${{ inputs.working-directory }}
+        run: npm run test:browser

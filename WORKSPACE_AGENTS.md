@@ -158,6 +158,10 @@ ignored files, such as `.svelte-kit/` or `dist/`, unless a task explicitly requi
 ### Agent And Skill Execution
 
 - Execute a skill's instructions in the active primary agent session, using that session's model and compute. Treat a skill as portable instruction text: its location under Claude, Codex, or another agent does not authorize launching that vendor's CLI, subprocess, remote session, or separate agent runtime. Naming a skill from another agent ecosystem requests the skill's workflow, not that ecosystem's compute. Use separate agent compute only when the user explicitly asks to run that separate agent or model rather than merely naming its skill.
+- End a session's final report by suggesting every follow-up decision noticed while working, whether or not the user
+  asked for them, such as a deferred fix, a tradeoff left open, or a related problem outside the task. Give each
+  decision the concrete case, the options, and a recommendation. Suggest them only: act on one only after the user
+  chooses it.
 
 ### Commit Integrity
 

@@ -131,6 +131,16 @@ on:
         required: false
         type: boolean
         default: true
+      run-test:
+        description: Run npm test during CI.
+        required: false
+        type: boolean
+        default: false
+      run-browser-test:
+        description: Install Playwright's Chromium and run npm run test:browser during CI.
+        required: false
+        type: boolean
+        default: false
       allowed-dispatch-actor:
         description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
         required: false
@@ -364,6 +374,8 @@ jobs:
       run-lint: ${{ inputs.run-lint }}
       run-check: ${{ inputs.run-check }}
       run-build: ${{ inputs.run-build }}
+      run-test: ${{ inputs.run-test }}
+      run-browser-test: ${{ inputs.run-browser-test }}
       vite-public-environment: ${{ inputs.vite-public-environment }}
       shared-automation-repository: ${{ inputs.shared-automation-repository }}
       shared-automation-ref: ${{ inputs.shared-automation-ref }}
