@@ -188,7 +188,7 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ github.event.repository.name }}/${{ inputs.working-directory }}/package-lock.json
 
-      - name: Check out, install, and build local dependencies
+      - name: Checkout local dependencies
         if: inputs.local-dependency-repositories != ''
         env:
           FETCH_TOKEN: ${{ secrets.CHECKOUT_TOKEN || github.token }}
@@ -212,8 +212,36 @@ jobs:
             fi
 
             auth_header="$(printf 'x-access-token:%s' "$FETCH_TOKEN" | base64 | tr -d '\n')"
-            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
-              clone --branch "$ref" --depth 1 "https://github.com/${repository}.git" "$path"
+
+            if [[ "$ref" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
+                clone --no-checkout --depth 1 "https://github.com/${repository}.git" "$path"
+              git -C "$path" -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
+                fetch --depth 1 origin "$ref"
+              git -C "$path" checkout --detach FETCH_HEAD
+            else
+              git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" \
+                clone --branch "$ref" --depth 1 "https://github.com/${repository}.git" "$path"
+            fi
+          done <<< "$LOCAL_DEPENDENCY_REPOSITORIES"
+
+      # Apart from the step above, so a dependency's install and build scripts never see the checkout token.
+      - name: Install and build local dependencies
+        if: inputs.local-dependency-repositories != ''
+        env:
+          LOCAL_DEPENDENCY_REPOSITORIES: ${{ inputs.local-dependency-repositories }}
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r spec; do
+            spec="${spec#"${spec%%[![:space:]]*}"}"
+            spec="${spec%"${spec##*[![:space:]]}"}"
+
+            if [[ -z "$spec" ]]; then
+              continue
+            fi
+
+            IFS=: read -r _ path _ <<< "$spec"
 
             if [[ -f "$path/package-lock.json" ]]; then
               npm --prefix "$path" ci
