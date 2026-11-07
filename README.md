@@ -106,6 +106,10 @@ The workflow accepts these inputs:
 - required `aws-region`
 - optional `aws-role-to-assume` for OIDC authentication
 - optional `deploy-on-changes-to`, which deploys only when that path changed as described above; empty always deploys
+- `install-root-dependencies`, defaulting to `false`, which also runs `npm ci` at the caller's repository root for a
+  stack that bundles code from outside its package
+- optional `local-dependency-repositories`, newline-separated `owner/repo:path:ref` specs, each cloned beside the caller
+  and installed and built before the caller's own install
 - `node-version`, defaulting to `24`
 - `run-synth` and `run-test`, both defaulting to `true`
 - required `stack-name`
@@ -116,7 +120,10 @@ AWS OIDC is preferred. Every caller grants its reusable-workflow job `contents: 
 workflow cannot request a permission its caller withholds. A
 caller that passes `aws-role-to-assume` stores the deployment role ARN in a repository variable. When the role input is
 empty, callers must forward `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; `AWS_SESSION_TOKEN` is optional. Missing
-credentials fail before checkout or deployment.
+credentials fail before checkout or deployment. The optional `CHECKOUT_TOKEN` secret reads private local dependency
+repositories, and `github.token` is used without it.
+
+The caller checks out under its repository name, so a relative `file:` dependency resolves beside it, as in shared CI.
 
 This reusable workflow is not directly dispatchable from the GitHub Actions UI. A local caller may expose
 `workflow_dispatch`; the shared workflow permits that deployment only for `allowed-dispatch-actor`.
