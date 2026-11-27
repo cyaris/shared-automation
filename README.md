@@ -469,6 +469,7 @@ Important inputs:
   - `run-build`
   - `run-test`, defaulting to `false`
   - `run-browser-test`, defaulting to `false`
+  - `ci-timeout-minutes`, defaulting to `30`, passed to the CI job's `timeout-minutes`
 - Deployment gate: `deployment-enabled`, which skips only upload after CI
 - Upload inputs
   - `dist-directory`

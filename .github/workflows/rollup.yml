@@ -141,6 +141,11 @@ on:
         required: false
         type: boolean
         default: false
+      ci-timeout-minutes:
+        description: Minutes the CI job may run before GitHub cancels it.
+        required: false
+        type: number
+        default: 30
       allowed-dispatch-actor:
         description: GitHub actor allowed to run this workflow from workflow_dispatch callers.
         required: false
@@ -376,6 +381,7 @@ jobs:
       run-build: ${{ inputs.run-build }}
       run-test: ${{ inputs.run-test }}
       run-browser-test: ${{ inputs.run-browser-test }}
+      timeout-minutes: ${{ inputs.ci-timeout-minutes }}
       vite-public-environment: ${{ inputs.vite-public-environment }}
       shared-automation-repository: ${{ inputs.shared-automation-repository }}
       shared-automation-ref: ${{ inputs.shared-automation-ref }}
