@@ -302,8 +302,8 @@ disables the step:
 
 `run-test` defaults to `false` because not every caller declares a `test` script.
 
-`run-browser-test`, also defaulting to `false`, adds two steps after the build: `npx playwright install --with-deps
-chromium`, then `npm run test:browser`. The caller declares `@playwright/test` as a development dependency, and its
+`run-browser-test`, also defaulting to `false`, adds two steps after the build: `npx playwright install --with-deps`
+for the space-separated `playwright-browsers`, which default to `chromium`, then `npm run test:browser`. The caller declares `@playwright/test` as a development dependency, and its
 `test:browser` script builds and serves whatever it tests, typically through its Playwright `webServer`.
 
 Typical caller wrapper:
@@ -338,6 +338,7 @@ Important inputs:
   - `run-build`
 - `run-test` to run `npm test`, defaulting to `false`
 - `run-browser-test` to run `npm run test:browser` after the build, defaulting to `false`
+- `playwright-browsers`, defaulting to `chromium`, naming the space-separated browsers `run-browser-test` installs
 - optional `local-dependency-repositories` entries as `owner/repo:path:ref`
 - optional `vite-public-environment` entries as `VITE_NAME=value`; values reach only `npm run build` and must be public
 - `shared-automation-repository` and `shared-automation-ref`, defaulting to `cyaris/shared-automation` on `main`, naming
@@ -469,6 +470,7 @@ Important inputs:
   - `run-build`
   - `run-test`, defaulting to `false`
   - `run-browser-test`, defaulting to `false`
+  - `playwright-browsers`, defaulting to `chromium`, passed to the CI job
   - `ci-timeout-minutes`, defaulting to `30`, passed to the CI job's `timeout-minutes`
 - Deployment gate: `deployment-enabled`, which skips only upload after CI
 - Upload inputs

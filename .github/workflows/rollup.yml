@@ -137,10 +137,15 @@ on:
         type: boolean
         default: false
       run-browser-test:
-        description: Install Playwright's Chromium and run npm run test:browser during CI.
+        description: Install the playwright-browsers and run npm run test:browser during CI.
         required: false
         type: boolean
         default: false
+      playwright-browsers:
+        description: Space-separated Playwright browsers that run-browser-test installs.
+        required: false
+        type: string
+        default: chromium
       ci-timeout-minutes:
         description: Minutes the CI job may run before GitHub cancels it.
         required: false
@@ -381,6 +386,7 @@ jobs:
       run-build: ${{ inputs.run-build }}
       run-test: ${{ inputs.run-test }}
       run-browser-test: ${{ inputs.run-browser-test }}
+      playwright-browsers: ${{ inputs.playwright-browsers }}
       timeout-minutes: ${{ inputs.ci-timeout-minutes }}
       vite-public-environment: ${{ inputs.vite-public-environment }}
       shared-automation-repository: ${{ inputs.shared-automation-repository }}
